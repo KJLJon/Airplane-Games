@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <base href="/airplane-games/">
+  <title>Chess Puzzles — Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body { display:flex; flex-direction:column; height:100dvh; overflow:hidden; background:var(--bg-deep); }
+    .game-header { display:flex; align-items:center; gap:8px; padding:10px 16px; background:var(--bg-panel); border-bottom:1px solid var(--border-subtle); flex-shrink:0; }
+    .game-header h1 { font-family:'Outfit',sans-serif; font-size:1.1rem; color:var(--text-primary); flex:1; margin:0; }
+    .btn { padding:8px 12px; background:var(--bg-card); border:1px solid var(--accent-warm); color:var(--accent-warm); border-radius:8px; cursor:pointer; font-size:0.85rem; min-height:44px; font-family:'Inter',sans-serif; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .btn:hover { background:rgba(247,169,74,0.15); }
+    .game-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:10px; overflow:hidden; }
+    .puzzle-info { display:flex; gap:16px; align-items:center; font-size:0.9rem; color:var(--text-dim); flex-wrap:wrap; justify-content:center; }
+    .puzzle-info b { color:var(--accent-warm); }
+    #board-wrap { position:relative; }
+    #board { display:grid; grid-template-columns:repeat(8,1fr); width:min(360px,90vw); aspect-ratio:1; border:2px solid var(--border-subtle); border-radius:4px; overflow:hidden; }
+    .sq { display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; transition:background 0.1s; }
+    .sq.light { background:#f0d9b5; }
+    .sq.dark { background:#b58863; }
+    .sq.selected { background:#7fc97f !important; }
+    .sq.hint { background:#7c6af7 !important; }
+    .sq.legal { }
+    .sq.legal::after { content:''; position:absolute; width:35%; height:35%; background:rgba(0,0,0,0.25); border-radius:50%; pointer-events:none; }
+    .sq.last-move { background:rgba(247,169,74,0.4) !important; }
+    .piece { font-size:clamp(1.4rem,6vw,2.2rem); line-height:1; pointer-events:none; user-select:none; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+    #hint-btn { }
+    #hints-left { color:var(--text-dim); font-size:0.8rem; }
+    .msg { font-size:1rem; font-weight:700; min-height:24px; text-align:center; }
+    .msg.success { color:var(--accent-green); }
+    .msg.error { color:var(--accent-red); }
+    .progress { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; max-width:360px; }
+    .prog-dot { width:14px; height:14px; border-radius:50%; border:1px solid var(--border-subtle); background:var(--bg-card); }
+    .prog-dot.done { background:var(--accent-green); }
+    .prog-dot.current { background:var(--accent-warm); }
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100; align-items:center; justify-content:center; }
+    .modal.show { display:flex; }
+    .modal-box { background:var(--bg-panel); border:1px solid var(--border-subtle); border-radius:16px; padding:28px; text-align:center; max-width:300px; width:90%; }
+    .modal-box h2 { font-family:'Outfit',sans-serif; font-size:1.6rem; margin:0 0 10px; }
+    .coords { position:absolute; font-size:9px; color:rgba(0,0,0,0.5); pointer-events:none; }
+    .coords.file { bottom:1px; right:3px; }
+    .coords.rank { top:1px; left:3px; }
+  </style>
+</head>
+<body>
+  <div class="game-header">
+    <a href="/airplane-games/" class="btn btn-back">← Hub</a>
+    <h1>Chess Puzzles</h1>
+    <span id="hints-left">3 hints</span>
+  </div>
+  <div class="game-body">
+    <div class="puzzle-info">
+      <span>Puzzle <b id="pnum">1</b>/20</span>
+      <span id="mate-label">Mate in 1</span>
+      <span>Completed: <b id="completed">0</b></span>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div id="board-wrap"><div id="board"></div></div>
+    <div class="controls">
+      <button class="btn" id="hint-btn">💡 Hint</button>
+      <button class="btn" id="prev-btn">← Prev</button>
+      <button class="btn" id="next-btn">Next →</button>
+    </div>
+    <div class="progress" id="progress"></div>
+  </div>
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <h2 id="modal-title">Correct!</h2>
+      <p id="modal-msg"></p>
+      <button class="btn" id="modal-next" style="width:100%;margin-bottom:8px;">Next Puzzle →</button>
+      <a href="/airplane-games/" class="btn" style="display:block;text-align:center;">← Hub</a>
+    </div>
+  </div>
+  <script src="js/shared.js"></script>
+  <script>
+  // 20 real chess puzzles: {fen, solution (array of moves in "from-to" format), mate, turn}
+  // Mate in 1 puzzles (white to move)
+  const PUZZLES = [
+    {id:1,fen:"r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",sol:["f3g5","f6e4"],mate:1,label:"Mate in 2"},
+    {id:2,fen:"rnbqkb1r/pppp1ppp/8/4p3/6Pn/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",sol:["d1h5"],mate:1,label:"Mate in 1"},
+    {id:3,fen:"r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 2 4",sol:["f3f7"],mate:1,label:"Mate in 1"},
+    {id:4,fen:"6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1",sol:["e1e8"],mate:1,label:"Mate in 1"},
+    {id:5,fen:"r5rk/5p1p/5R2/p4Q2/8/8/7P/7K w - - 0 1",sol:["f5f7"],mate:1,label:"Mate in 1"},
+    {id:6,fen:"2k5/ppp5/2n5/3Q4/8/8/8/2K5 w - - 0 1",sol:["d5c6"],mate:1,label:"Mate in 1"},
+    {id:7,fen:"r4rk1/ppp2ppp/8/3Q4/1n6/8/PPP2PPP/R3K2R w KQ - 0 1",sol:["d5g8"],mate:1,label:"Mate in 1"},
+    {id:8,fen:"3k4/3R4/8/3K4/8/8/8/8 w - - 0 1",sol:["d7d8"],mate:1,label:"Mate in 1"},
+    {id:9,fen:"8/8/8/8/8/2k5/2q5/2K5 b - - 0 1",sol:["c2c1"],mate:1,label:"Mate in 1 (Black)"},
+    {id:10,fen:"8/8/8/8/8/7k/5r2/7K b - - 0 1",sol:["f2h2"],mate:1,label:"Mate in 1 (Black)"},
+    {id:11,fen:"r1bq1rk1/ppp2ppp/2n5/3pp3/1bP5/1PN1PN2/PB1P1PPP/R2QKB1R b KQ - 1 8",sol:["d5d4","e3d5","d8g5"],mate:2,label:"Mate in 2 (Black)"},
+    {id:12,fen:"r1bqk2r/ppp2ppp/2n5/3pp3/1bBP4/2N1PN2/PPP2PPP/R1BQK2R w KQkq - 0 7",sol:["c4f7","e8f7","d1d5"],mate:2,label:"Mate in 2"},
+    {id:13,fen:"2rq1rk1/pb3ppp/1p2p3/2ppP3/3P1n2/2PB1N2/PP3PPP/R1BQ1RK1 b - - 0 14",sol:["f4h3","g2h3","d8h4"],mate:2,label:"Mate in 2 (Black)"},
+    {id:14,fen:"r1b2rk1/ppq2ppp/2n1p3/3pP3/2pP4/2P2N2/PPQ2PPP/R1B1R1K1 w - - 0 12",sol:["f3g5","g7g6","g5f7"],mate:2,label:"Mate in 2"},
+    {id:15,fen:"r3r1k1/pp3ppp/2p5/8/2B5/1P6/P4PPP/3RR1K1 w - - 0 20",sol:["c4f7","g8f7","d1d7"],mate:2,label:"Mate in 2"},
+    {id:16,fen:"6k1/R7/6K1/8/8/8/8/8 w - - 0 1",sol:["a7a8"],mate:1,label:"Mate in 1"},
+    {id:17,fen:"8/8/8/8/8/1k6/8/RK6 w - - 0 1",sol:["a1a3"],mate:1,label:"Mate in 1"},
+    {id:18,fen:"r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPPBPPP/RNBQK2R w KQkq - 4 4",sol:["f3e5","c6e5"],mate:1,label:"Tactic"},
+    {id:19,fen:"rnb1kbnr/pppp1ppp/8/4p3/5PPq/8/PPPPP2P/RNBQKBNR w KQkq - 1 3",sol:["g2g3"],mate:0,label:"Forced Move"},
+    {id:20,fen:"r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",sol:["f3e5","d8g5","e5f3","g5g2"],mate:0,label:"Tactic"}
+  ];
+
+  const FILES='abcdefgh', PIECES='KQRBNPkqrbnp';
+  const WPCS='KQRBNP', BPCS='kqrbnp';
+  const SYMBOLS={'K':'♔','Q':'♕','R':'♖','B':'♗','N':'♘','P':'♙','k':'♚','q':'♛','r':'♜','b':'♝','n':'♞','p':'♟'};
+
+  let board=[], turn='w', selected=null, legalSquares=[], puzzleIdx=0, solStep=0, hints=3;
+  let completed = JSON.parse(localStorage.getItem('ag_chess_completed')||'[]');
+
+  function parseFEN(fen) {
+    const [pos,,t] = fen.split(' ');
+    const b = Array(64).fill(null);
+    let r=0,f=0;
+    for (const ch of pos) {
+      if(ch==='/'){r++;f=0;}
+      else if(/\d/.test(ch)){f+=parseInt(ch);}
+      else{b[r*8+f]=ch;f++;}
+    }
+    return {b,t:t||'w'};
+  }
+
+  function loadPuzzle(idx) {
+    const p = PUZZLES[idx];
+    const {b,t} = parseFEN(p.fen);
+    board = b; turn = t; selected = null; legalSquares = []; solStep = 0; hints = 3;
+    document.getElementById('pnum').textContent = idx+1;
+    document.getElementById('mate-label').textContent = p.label;
+    document.getElementById('hints-left').textContent = hints+' hints';
+    document.getElementById('modal').classList.remove('show');
+    setMsg('');
+    renderProgress();
+    renderBoard([], null);
+  }
+
+  function renderBoard(legal, sel) {
+    const el = document.getElementById('board');
+    el.innerHTML='';
+    for(let r=0;r<8;r++) for(let f=0;f<8;f++) {
+      const idx=r*8+f, sq=document.createElement('div');
+      sq.className='sq '+((r+f)%2===0?'light':'dark');
+      sq.dataset.idx=idx;
+      if(sel===idx) sq.classList.add('selected');
+      if(legal.includes(idx)) sq.classList.add('legal');
+      if(board[idx]) {
+        const piece=document.createElement('span');
+        piece.className='piece';
+        piece.textContent=SYMBOLS[board[idx]]||'';
+        sq.appendChild(piece);
+      }
+      // Coords
+      if(f===0){const c=document.createElement('span');c.className='coords rank';c.textContent=8-r;sq.appendChild(c);}
+      if(r===7){const c=document.createElement('span');c.className='coords file';c.textContent=FILES[f];sq.appendChild(c);}
+      sq.addEventListener('click',()=>handleClick(idx));
+      el.appendChild(sq);
+    }
+  }
+
+  function getLegalMoves(idx) {
+    const piece=board[idx];
+    if(!piece) return [];
+    const moves=[];
+    const isWhite=WPCS.includes(piece);
+    const myPieces=isWhite?WPCS:BPCS;
+    const r=Math.floor(idx/8),f=idx%8;
+
+    function addIfValid(to) {
+      if(to<0||to>63) return;
+      if(myPieces.includes(board[to])) return;
+      moves.push(to);
+    }
+
+    const type=piece.toUpperCase();
+    if(type==='P') {
+      const dir=isWhite?-1:1;
+      const startRow=isWhite?6:1;
+      const nr=r+dir;
+      if(nr>=0&&nr<8) {
+        if(!board[nr*8+f]) {
+          moves.push(nr*8+f);
+          if(r===startRow&&!board[(r+2*dir)*8+f]) moves.push((r+2*dir)*8+f);
+        }
+        [-1,1].forEach(df=>{
+          const nf=f+df;
+          if(nf>=0&&nf<8&&board[nr*8+nf]&&!myPieces.includes(board[nr*8+nf])) moves.push(nr*8+nf);
+        });
+      }
+    } else if(type==='N') {
+      [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,df])=>{
+        const nr=r+dr,nf=f+df;
+        if(nr>=0&&nr<8&&nf>=0&&nf<8) addIfValid(nr*8+nf);
+      });
+    } else if(type==='K') {
+      for(let dr=-1;dr<=1;dr++) for(let df=-1;df<=1;df++) {
+        if(!dr&&!df) continue;
+        const nr=r+dr,nf=f+df;
+        if(nr>=0&&nr<8&&nf>=0&&nf<8) addIfValid(nr*8+nf);
+      }
+    } else {
+      const dirs = type==='R'?[[0,1],[0,-1],[1,0],[-1,0]]:
+                   type==='B'?[[1,1],[1,-1],[-1,1],[-1,-1]]:
+                   [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+      dirs.forEach(([dr,df])=>{
+        let nr=r+dr,nf=f+df;
+        while(nr>=0&&nr<8&&nf>=0&&nf<8) {
+          const to=nr*8+nf;
+          if(myPieces.includes(board[to])) break;
+          moves.push(to);
+          if(board[to]) break;
+          nr+=dr; nf+=df;
+        }
+      });
+    }
+    return moves;
+  }
+
+  function handleClick(idx) {
+    const puzzle=PUZZLES[puzzleIdx];
+    if(solStep>=puzzle.sol.length) return;
+
+    const piece=board[idx];
+    const myPcs = turn==='w'?WPCS:BPCS;
+
+    if(selected===null) {
+      if(!piece||!myPcs.includes(piece)) return;
+      selected=idx;
+      legalSquares=getLegalMoves(idx);
+      renderBoard(legalSquares, selected);
+    } else {
+      if(piece&&myPcs.includes(piece)&&idx!==selected) {
+        selected=idx;
+        legalSquares=getLegalMoves(idx);
+        renderBoard(legalSquares, selected);
+        return;
+      }
+      const fromFile=FILES[selected%8], fromRank=String(8-Math.floor(selected/8));
+      const toFile=FILES[idx%8], toRank=String(8-Math.floor(idx/8));
+      const moveStr=fromFile+fromRank+toFile+toRank;
+      const expected=puzzle.sol[solStep];
+
+      if(moveStr===expected) {
+        // Make the move
+        board[idx]=board[selected]; board[selected]=null;
+        selected=null; legalSquares=[]; solStep++;
+        renderBoard([],null);
+
+        if(solStep>=puzzle.sol.length) {
+          setMsg('✓ Correct! Puzzle solved.','success');
+          if(!completed.includes(puzzleIdx)) {
+            completed.push(puzzleIdx);
+            localStorage.setItem('ag_chess_completed',JSON.stringify(completed));
+            Scores.set('chess-puzzles',completed.length);
+          }
+          document.getElementById('completed').textContent=completed.length;
+          setTimeout(()=>showModal(true),500);
+        } else {
+          setMsg('Good! Continue...','success');
+          turn=turn==='w'?'b':'w';
+          // Auto-play opponent response after a pause
+          if(solStep<puzzle.sol.length&&puzzle.sol[solStep]) {
+            setTimeout(()=>{
+              const m=puzzle.sol[solStep];
+              const fr=8-parseInt(m[1]),ff=FILES.indexOf(m[0]),tr2=8-parseInt(m[3]),tf=FILES.indexOf(m[2]);
+              const fi=fr*8+ff,ti=tr2*8+tf;
+              board[ti]=board[fi]; board[fi]=null;
+              solStep++; turn=turn==='w'?'b':'w';
+              setMsg('Your turn...','');
+              renderBoard([],null);
+            },600);
+          }
+        }
+      } else {
+        setMsg('✗ Wrong move, try again.','error');
+        selected=null; legalSquares=[];
+        renderBoard([],null);
+        setTimeout(()=>setMsg(''),1500);
+      }
+    }
+  }
+
+  function setMsg(msg, cls='') {
+    const el=document.getElementById('msg');
+    el.textContent=msg; el.className='msg'+(cls?' '+cls:'');
+  }
+
+  function showModal(won) {
+    document.getElementById('modal-title').textContent=won?'Brilliant! ✓':'Keep trying';
+    document.getElementById('modal-msg').textContent=won?`Puzzle ${puzzleIdx+1} solved!`:'';
+    document.getElementById('modal').classList.add('show');
+  }
+
+  function renderProgress() {
+    const el=document.getElementById('progress');
+    el.innerHTML='';
+    PUZZLES.forEach((_,i)=>{
+      const d=document.createElement('div');
+      d.className='prog-dot'+(completed.includes(i)?' done':'')+(i===puzzleIdx?' current':'');
+      el.appendChild(d);
+    });
+    document.getElementById('completed').textContent=completed.length;
+  }
+
+  document.getElementById('hint-btn').addEventListener('click',()=>{
+    if(hints<=0){setMsg('No hints left','error');return;}
+    hints--;
+    document.getElementById('hints-left').textContent=hints+' hints';
+    const m=PUZZLES[puzzleIdx].sol[solStep];
+    const ff=FILES.indexOf(m[0]),fr=8-parseInt(m[1]);
+    const hi=fr*8+ff;
+    selected=hi; legalSquares=getLegalMoves(hi);
+    renderBoard(legalSquares,hi);
+    setMsg('Hint: move the highlighted piece');
+  });
+
+  document.getElementById('prev-btn').addEventListener('click',()=>{
+    if(puzzleIdx>0){puzzleIdx--;loadPuzzle(puzzleIdx);}
+  });
+  document.getElementById('next-btn').addEventListener('click',()=>{
+    if(puzzleIdx<PUZZLES.length-1){puzzleIdx++;loadPuzzle(puzzleIdx);}
+  });
+  document.getElementById('modal-next').addEventListener('click',()=>{
+    document.getElementById('modal').classList.remove('show');
+    if(puzzleIdx<PUZZLES.length-1){puzzleIdx++;loadPuzzle(puzzleIdx);}
+  });
+
+  loadPuzzle(0);
+  </script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!--
+  Airplane Games – Browser Icon Generator
+  Open this file in a browser to regenerate and download the PWA icons.
+  No server required — runs entirely client-side via <canvas>.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Icon Generator – Airplane Games</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0d0d10;
+      color: #f0f0f5;
+      font-family: system-ui, sans-serif;
+      padding: 40px 24px;
+      text-align: center;
+    }
+    h1 { font-size: 22px; margin-bottom: 8px; color: #7c6af7; }
+    p  { color: #888899; font-size: 14px; margin-bottom: 32px; }
+    .previews {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+      margin-bottom: 32px;
+    }
+    .preview { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .preview canvas { border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    .preview span { font-size: 12px; color: #888899; }
+    .btn {
+      display: inline-block;
+      padding: 10px 24px;
+      background: transparent;
+      border: 2px solid #7c6af7;
+      color: #7c6af7;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 4px;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: rgba(124,106,247,0.15); }
+  </style>
+</head>
+<body>
+  <h1>Airplane Games – Icon Generator</h1>
+  <p>Preview icons below, then click each button to download. Save files to <code>icons/</code>.</p>
+  <div class="previews" id="previews"></div>
+  <div id="buttons"></div>
+
+  <script>
+    const BG     = '#1a1a2e';
+    const ACCENT = '#7c6af7';
+    const RIM    = '#2c2c4e';
+
+    // 7×9 pixel-font glyphs
+    const GLYPH_A = [
+      '0011100',
+      '0100010',
+      '1000001',
+      '1000001',
+      '1111111',
+      '1000001',
+      '1000001',
+      '1000001',
+      '1000001',
+    ];
+    const GLYPH_G = [
+      '0111110',
+      '1000001',
+      '1000000',
+      '1000000',
+      '1001111',
+      '1000001',
+      '1000001',
+      '1000001',
+      '0111110',
+    ];
+
+    function drawGlyph(ctx, glyph, ox, oy, scale, colour) {
+      ctx.fillStyle = colour;
+      glyph.forEach((row, gy) => {
+        [...row].forEach((bit, gx) => {
+          if (bit === '1') {
+            ctx.fillRect(ox + gx * scale, oy + gy * scale, scale, scale);
+          }
+        });
+      });
+    }
+
+    function makeIcon(size, maskable) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, size, size);
+
+      // Subtle circular rim
+      const cx = size / 2, cy = size / 2;
+      const outerR = size / 2 - 1;
+      const innerR = outerR - Math.max(2, size / 80);
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+      ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+      ctx.fillStyle = RIM;
+      ctx.fill('evenodd');
+
+      // Glyph sizing
+      const safe       = maskable ? 0.72 : 0.88;
+      const contentW   = Math.floor(size * safe);
+      const totalUnits = 7 * 2 + 1;   // A + gap + G in pixel-font units
+      const scale      = Math.max(1, Math.floor(contentW / (totalUnits + 2)));
+
+      const totalPxW = (7 * 2 + 1) * scale;
+      const totalPxH = 9 * scale;
+      const startX   = Math.floor((size - totalPxW) / 2);
+      const startY   = Math.floor((size - totalPxH) / 2);
+
+      drawGlyph(ctx, GLYPH_A, startX,               startY, scale, ACCENT);
+      drawGlyph(ctx, GLYPH_G, startX + 8 * scale,   startY, scale, ACCENT);
+
+      return canvas;
+    }
+
+    const icons = [
+      { name: 'icon-192.png',      size: 192, maskable: false, display: 96 },
+      { name: 'icon-512.png',      size: 512, maskable: false, display: 128 },
+      { name: 'icon-maskable.png', size: 512, maskable: true,  display: 128 },
+    ];
+
+    const previews = document.getElementById('previews');
+    const buttons  = document.getElementById('buttons');
+
+    icons.forEach(({ name, size, maskable, display }) => {
+      const canvas = makeIcon(size, maskable);
+
+      // Scaled preview
+      const preview = document.createElement('div');
+      preview.className = 'preview';
+      const scaled = document.createElement('canvas');
+      scaled.width = scaled.height = display;
+      scaled.getContext('2d').drawImage(canvas, 0, 0, display, display);
+      const label = document.createElement('span');
+      label.textContent = `${name} (${size}×${size})`;
+      preview.appendChild(scaled);
+      preview.appendChild(label);
+      previews.appendChild(preview);
+
+      // Download button
+      const btn = document.createElement('a');
+      btn.className = 'btn';
+      btn.textContent = `Download ${name}`;
+      btn.href = canvas.toDataURL('image/png');
+      btn.download = name;
+      buttons.appendChild(btn);
+    });
+  </script>
+</body>
+</html>

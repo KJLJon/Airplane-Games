@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <base href="/airplane-games/">
+  <title>2048 — Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body { display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+    .game-header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--bg-panel); border-bottom:1px solid var(--border-subtle); flex-shrink:0; }
+    .game-header h1 { font-family:'Outfit',sans-serif; font-size:1.2rem; color:var(--text-primary); flex:1; margin:0; }
+    .score-box { background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:8px; padding:6px 12px; text-align:center; min-width:70px; }
+    .score-box .label { font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
+    .score-box .val { font-size:1.1rem; font-weight:700; color:var(--accent-warm); }
+    .game-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:12px; overflow:hidden; }
+    .controls-row { display:flex; gap:8px; }
+    .btn { padding:8px 16px; background:var(--bg-card); border:1px solid var(--accent-warm); color:var(--accent-warm); border-radius:8px; cursor:pointer; font-size:0.9rem; min-height:44px; font-family:'Inter',sans-serif; }
+    .btn:hover { background:rgba(247,169,74,0.15); }
+    #board { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; background:#bbada0; border-radius:8px; padding:8px; width:min(350px,90vw); aspect-ratio:1; }
+    .cell { border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:700; font-family:'Outfit',sans-serif; transition:all 0.1s; aspect-ratio:1; }
+    .cell-0 { background:#cdc1b4; }
+    .cell-2 { background:#eee4da; color:#776e65; }
+    .cell-4 { background:#ede0c8; color:#776e65; }
+    .cell-8 { background:#f2b179; color:#f9f6f2; }
+    .cell-16 { background:#f59563; color:#f9f6f2; }
+    .cell-32 { background:#f67c5f; color:#f9f6f2; }
+    .cell-64 { background:#f65e3b; color:#f9f6f2; }
+    .cell-128 { background:#edcf72; color:#f9f6f2; }
+    .cell-256 { background:#edcc61; color:#f9f6f2; }
+    .cell-512 { background:#edc850; color:#f9f6f2; }
+    .cell-1024 { background:#edc53f; color:#f9f6f2; }
+    .cell-2048 { background:#edc22e; color:#f9f6f2; }
+    .cell-big { background:#7c6af7; color:#fff; }
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
+    .modal.show { display:flex; }
+    .modal-box { background:var(--bg-panel); border:1px solid var(--border-subtle); border-radius:16px; padding:32px; text-align:center; max-width:320px; width:90%; }
+    .modal-box h2 { font-family:'Outfit',sans-serif; font-size:1.8rem; margin:0 0 12px; }
+    .modal-box p { color:var(--text-dim); margin:0 0 20px; }
+    .best-tile { font-size:2rem; font-weight:700; color:var(--accent-warm); margin:8px 0; }
+    .btn-back { text-decoration:none; font-size:0.85rem; padding:8px 12px; }
+  </style>
+</head>
+<body>
+  <div class="game-header">
+    <a href="/airplane-games/" class="btn btn-back">← Hub</a>
+    <h1>2048</h1>
+    <div class="score-box"><div class="label">Score</div><div class="val" id="score">0</div></div>
+    <div class="score-box"><div class="label">Best</div><div class="val" id="best">0</div></div>
+  </div>
+  <div class="game-body">
+    <div class="controls-row">
+      <button class="btn" id="newBtn">New Game</button>
+      <button class="btn" id="undoBtn">Undo</button>
+    </div>
+    <div id="board"></div>
+    <div style="font-size:0.8rem;color:var(--text-dim);text-align:center;">Swipe or use arrow keys to merge tiles</div>
+  </div>
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <h2 id="modal-title">Game Over</h2>
+      <p id="modal-msg"></p>
+      <div class="best-tile" id="modal-tile"></div>
+      <button class="btn" onclick="newGame()" style="width:100%;margin-top:8px;">Play Again</button>
+      <a href="/airplane-games/" class="btn" style="display:block;margin-top:8px;text-decoration:none;text-align:center;">← Hub</a>
+    </div>
+  </div>
+  <script src="js/shared.js"></script>
+  <script>
+    let grid, score, best, prevGrid, prevScore, gameOver, won;
+    const SIZE = 4;
+
+    function init() {
+      best = parseInt(localStorage.getItem('ag_2048_best') || '0');
+      document.getElementById('best').textContent = best;
+      newGame();
+    }
+
+    function newGame() {
+      grid = Array.from({length:SIZE}, () => Array(SIZE).fill(0));
+      score = 0; gameOver = false; won = false;
+      prevGrid = null; prevScore = 0;
+      addTile(); addTile();
+      document.getElementById('modal').classList.remove('show');
+      render();
+    }
+
+    function addTile() {
+      const empties = [];
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (!grid[r][c]) empties.push([r,c]);
+      if (!empties.length) return;
+      const [r,c] = empties[Math.floor(Math.random()*empties.length)];
+      grid[r][c] = Math.random()<0.9 ? 2 : 4;
+    }
+
+    function copyGrid(g) { return g.map(r=>[...r]); }
+
+    function slideRow(row) {
+      let r = row.filter(x=>x);
+      let merged = false, pts = 0;
+      for (let i=0;i<r.length-1;i++) {
+        if (r[i]===r[i+1]) { r[i]*=2; pts+=r[i]; r.splice(i+1,1); i--; }
+      }
+      while (r.length<SIZE) r.push(0);
+      return {row:r, pts};
+    }
+
+    function move(dir) {
+      prevGrid = copyGrid(grid); prevScore = score;
+      let moved = false;
+      if (dir==='left') {
+        for (let r=0;r<SIZE;r++) {
+          const {row,pts} = slideRow(grid[r]);
+          if (JSON.stringify(row)!==JSON.stringify(grid[r])) moved=true;
+          grid[r]=row; score+=pts;
+        }
+      } else if (dir==='right') {
+        for (let r=0;r<SIZE;r++) {
+          const {row,pts} = slideRow([...grid[r]].reverse());
+          row.reverse();
+          if (JSON.stringify(row)!==JSON.stringify(grid[r])) moved=true;
+          grid[r]=row; score+=pts;
+        }
+      } else if (dir==='up') {
+        for (let c=0;c<SIZE;c++) {
+          const col = grid.map(r=>r[c]);
+          const {row:newCol,pts} = slideRow(col);
+          if (JSON.stringify(newCol)!==JSON.stringify(col)) moved=true;
+          newCol.forEach((v,r)=>{ grid[r][c]=v; }); score+=pts;
+        }
+      } else if (dir==='down') {
+        for (let c=0;c<SIZE;c++) {
+          const col = grid.map(r=>r[c]).reverse();
+          const {row:newCol,pts} = slideRow(col);
+          newCol.reverse();
+          const orig = grid.map(r=>r[c]);
+          if (JSON.stringify(newCol)!==JSON.stringify(orig)) moved=true;
+          newCol.forEach((v,r)=>{ grid[r][c]=v; }); score+=pts;
+        }
+      }
+      if (!moved) return;
+      addTile();
+      if (score>best) { best=score; localStorage.setItem('ag_2048_best',best); }
+      Scores.set('2048', score);
+      render();
+      checkWin();
+      if (!won && !canMove()) endGame();
+    }
+
+    function canMove() {
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) {
+        if (!grid[r][c]) return true;
+        if (c<SIZE-1 && grid[r][c]===grid[r][c+1]) return true;
+        if (r<SIZE-1 && grid[r][c]===grid[r+1][c]) return true;
+      }
+      return false;
+    }
+
+    function getBestTile() {
+      let m=0;
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) m=Math.max(m,grid[r][c]);
+      return m;
+    }
+
+    function checkWin() {
+      if (!won) {
+        for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) {
+          if (grid[r][c]>=2048) { won=true; showModal('You Win!','Keep going for a higher score!',getBestTile()); return; }
+        }
+      }
+    }
+
+    function endGame() {
+      gameOver=true;
+      const bt = getBestTile();
+      localStorage.setItem('ag_2048_besttile', Math.max(bt, parseInt(localStorage.getItem('ag_2048_besttile')||'0')));
+      showModal('Game Over','No more moves!',bt);
+    }
+
+    function showModal(title,msg,tile) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-msg').textContent = msg;
+      document.getElementById('modal-tile').textContent = tile ? '★ ' + tile : '';
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function render() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('best').textContent = best;
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) {
+        const v = grid[r][c];
+        const el = document.createElement('div');
+        el.className = v <= 2048 ? `cell cell-${v}` : 'cell cell-big';
+        if (v) {
+          el.textContent = v;
+          const s = v >= 1024 ? '1.1rem' : v >= 100 ? '1.4rem' : '1.8rem';
+          el.style.fontSize = s;
+        }
+        board.appendChild(el);
+      }
+    }
+
+    // Keyboard
+    document.addEventListener('keydown', e => {
+      const map = {ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+      if (map[e.key]) { e.preventDefault(); if (!gameOver) move(map[e.key]); }
+    });
+
+    // Touch swipe
+    let tx=0, ty=0;
+    document.addEventListener('touchstart', e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
+    document.addEventListener('touchend', e=>{
+      if (gameOver) return;
+      const dx = e.changedTouches[0].clientX - tx;
+      const dy = e.changedTouches[0].clientY - ty;
+      if (Math.abs(dx)>Math.abs(dy)) { if (Math.abs(dx)>30) move(dx>0?'right':'left'); }
+      else { if (Math.abs(dy)>30) move(dy>0?'down':'up'); }
+    }, {passive:true});
+
+    document.getElementById('newBtn').addEventListener('click', newGame);
+    document.getElementById('undoBtn').addEventListener('click', () => {
+      if (prevGrid) { grid=prevGrid; score=prevScore; prevGrid=null; gameOver=false; render(); }
+    });
+
+    init();
+  </script>
+</body>
+</html>
