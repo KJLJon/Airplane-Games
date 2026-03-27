@@ -88,10 +88,51 @@ function showToast(message, duration = 2000) {
   toast._timeout = setTimeout(() => { toast.style.opacity = '0'; }, duration);
 }
 
-// ── Register Service Worker ───────────────────────────────────
+// ── Register Service Worker + Update Banner ───────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/Airplane-Games/sw.js')
+      .then(reg => {
+        function trackWorker(worker) {
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              _showUpdateBanner(reg);
+            }
+          });
+        }
+        if (reg.installing) trackWorker(reg.installing);
+        reg.addEventListener('updatefound', () => trackWorker(reg.installing));
+        if (reg.waiting && navigator.serviceWorker.controller) _showUpdateBanner(reg);
+      })
       .catch(err => console.warn('SW registration failed:', err));
+
+    // When the SW takes control, reload to pick up fresh content
+    let _refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!_refreshing) { _refreshing = true; window.location.reload(); }
+    });
+  });
+}
+
+function _showUpdateBanner(reg) {
+  if (document.getElementById('ag-update-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'ag-update-banner';
+  banner.style.cssText = [
+    'position:fixed;top:0;left:0;right:0',
+    'background:#1e293b;color:#f0f0f5',
+    'padding:8px 16px',
+    'display:flex;align-items:center;justify-content:space-between;gap:12px',
+    'z-index:99999;border-bottom:2px solid #7c6af7',
+    'font-family:Inter,sans-serif;font-size:14px',
+  ].join(';');
+  banner.innerHTML = '<span>New version available!</span>'
+    + '<button id="ag-update-btn" style="background:#7c6af7;color:#fff;border:none;'
+    + 'border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px;font-weight:600">'
+    + 'Update Now</button>';
+  document.body.prepend(banner);
+  document.getElementById('ag-update-btn').addEventListener('click', () => {
+    const w = reg.waiting;
+    if (w) w.postMessage({ type: 'SKIP_WAITING' });
   });
 }
