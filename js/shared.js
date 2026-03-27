@@ -91,7 +91,7 @@ function showToast(message, duration = 2000) {
 // ── Register Service Worker ───────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/airplane-games/sw.js')
+    navigator.serviceWorker.register('/Airplane-Games/sw.js')
       .catch(err => console.warn('SW registration failed:', err));
   });
 }

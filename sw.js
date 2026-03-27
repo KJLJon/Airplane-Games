@@ -1,33 +1,33 @@
 const CACHE_VERSION = 'airplane-games-v1';
 
 const PRECACHE_URLS = [
-  '/airplane-games/',
-  '/airplane-games/index.html',
-  '/airplane-games/manifest.json',
-  '/airplane-games/css/main.css',
-  '/airplane-games/js/shared.js',
-  '/airplane-games/icons/icon-192.png',
-  '/airplane-games/icons/icon-512.png',
-  '/airplane-games/icons/icon-maskable.png',
-  '/airplane-games/fonts/Inter-Regular.woff2',
-  '/airplane-games/fonts/Inter-Bold.woff2',
-  '/airplane-games/fonts/Outfit-Regular.woff2',
-  '/airplane-games/fonts/Outfit-Bold.woff2',
-  '/airplane-games/games/tetris/index.html',
-  '/airplane-games/games/sudoku/index.html',
-  '/airplane-games/games/runner/index.html',
-  '/airplane-games/games/chess-puzzles/index.html',
-  '/airplane-games/games/sliding-puzzle/index.html',
-  '/airplane-games/games/snake/index.html',
-  '/airplane-games/games/traffic/index.html',
-  '/airplane-games/games/minesweeper/index.html',
-  '/airplane-games/games/wordle/index.html',
-  '/airplane-games/games/2048/index.html',
-  '/airplane-games/games/dogfight/index.html',
-  '/airplane-games/games/maze/index.html',
-  '/airplane-games/games/stratego/index.html',
-  '/airplane-games/games/nonogram/index.html',
-  '/airplane-games/games/flapper/index.html',
+  '/Airplane-Games/',
+  '/Airplane-Games/index.html',
+  '/Airplane-Games/manifest.json',
+  '/Airplane-Games/css/main.css',
+  '/Airplane-Games/js/shared.js',
+  '/Airplane-Games/icons/icon-192.png',
+  '/Airplane-Games/icons/icon-512.png',
+  '/Airplane-Games/icons/icon-maskable.png',
+  '/Airplane-Games/fonts/Inter-Regular.woff2',
+  '/Airplane-Games/fonts/Inter-Bold.woff2',
+  '/Airplane-Games/fonts/Outfit-Regular.woff2',
+  '/Airplane-Games/fonts/Outfit-Bold.woff2',
+  '/Airplane-Games/games/tetris/index.html',
+  '/Airplane-Games/games/sudoku/index.html',
+  '/Airplane-Games/games/runner/index.html',
+  '/Airplane-Games/games/chess-puzzles/index.html',
+  '/Airplane-Games/games/sliding-puzzle/index.html',
+  '/Airplane-Games/games/snake/index.html',
+  '/Airplane-Games/games/traffic/index.html',
+  '/Airplane-Games/games/minesweeper/index.html',
+  '/Airplane-Games/games/wordle/index.html',
+  '/Airplane-Games/games/2048/index.html',
+  '/Airplane-Games/games/dogfight/index.html',
+  '/Airplane-Games/games/maze/index.html',
+  '/Airplane-Games/games/stratego/index.html',
+  '/Airplane-Games/games/nonogram/index.html',
+  '/Airplane-Games/games/flapper/index.html',
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html>
@@ -87,7 +87,7 @@ const OFFLINE_HTML = `<!DOCTYPE html>
     <div class="icon">✈️</div>
     <h1>You're Offline</h1>
     <p>Looks like you've lost your connection. The games you've already visited are available — try going back to the hub.</p>
-    <a href="/airplane-games/" class="btn">Back to Hub</a>
+    <a href="/Airplane-Games/" class="btn">Back to Hub</a>
   </div>
 </body>
 </html>`;
@@ -129,7 +129,7 @@ self.addEventListener('fetch', event => {
   // Only handle GET requests within our scope
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (!url.pathname.startsWith('/airplane-games/')) return;
+  if (!url.pathname.startsWith('/Airplane-Games/')) return;
 
   event.respondWith(
     caches.match(event.request).then(cached => {

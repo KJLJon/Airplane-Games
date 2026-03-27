@@ -64,7 +64,7 @@ for p in pages:
   content = p.read_text(errors='ignore')
   name = str(p.relative_to(root))
   issues = []
-  if '<base href="/airplane-games/">' not in content:
+  if '<base href="/Airplane-Games/">' not in content:
     issues.append("missing base tag")
   if 'css/main.css' not in content:
     issues.append("missing main.css link")

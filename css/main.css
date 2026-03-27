@@ -6,7 +6,7 @@
 /* ── Web Fonts ─────────────────────────────────────────────── */
 @font-face {
   font-family: 'Inter';
-  src: url('/airplane-games/fonts/Inter-Regular.woff2') format('woff2');
+  src: url('/Airplane-Games/fonts/Inter-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -14,7 +14,7 @@
 
 @font-face {
   font-family: 'Inter';
-  src: url('/airplane-games/fonts/Inter-Bold.woff2') format('woff2');
+  src: url('/Airplane-Games/fonts/Inter-Bold.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -22,7 +22,7 @@
 
 @font-face {
   font-family: 'Outfit';
-  src: url('/airplane-games/fonts/Outfit-Regular.woff2') format('woff2');
+  src: url('/Airplane-Games/fonts/Outfit-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -30,7 +30,7 @@
 
 @font-face {
   font-family: 'Outfit';
-  src: url('/airplane-games/fonts/Outfit-Bold.woff2') format('woff2');
+  src: url('/Airplane-Games/fonts/Outfit-Bold.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
