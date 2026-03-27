@@ -66,7 +66,7 @@
     #setup-bar {
       flex-shrink:0;
       background:rgba(16,16,24,0.97); border-top:1px solid rgba(255,255,255,0.1);
-      padding:8px; z-index:20;
+      padding:8px; padding-bottom:max(8px, calc(env(safe-area-inset-bottom, 0px) + 4px)); z-index:20;
     }
     #piece-tray {
       display:flex; gap:4px; flex-wrap:nowrap;

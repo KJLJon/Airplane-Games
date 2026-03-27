@@ -544,13 +544,17 @@ function startGame() {
   newGame();
   running = true;
   if (rafId) cancelAnimationFrame(rafId);
-  loop();
+  _lastTs = 0;
+  rafId = requestAnimationFrame(loop);
 }
 
-function loop() {
+let _lastTs = 0;
+function loop(ts) {
+  rafId = requestAnimationFrame(loop);
+  if (ts - _lastTs < 14) return; // cap at ~60fps
+  _lastTs = ts;
   update();
   draw();
-  rafId = requestAnimationFrame(loop);
 }
 
 const _rec = Scores.get(GAME_ID);
