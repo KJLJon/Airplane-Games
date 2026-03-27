@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="description" content="Multiplier Runner – Navigate your crowd through gates">
+  <base href="/Airplane-Games/">
+  <title>Multiplier Runner - Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .game-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 10;
+    }
+
+    .back-button {
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 50%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .back-button:hover {
+      background: var(--bg-hover);
+      transform: translateX(-3px);
+    }
+
+    .hud-title {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .hud-stats {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent-primary);
+    }
+
+    #canvas {
+      flex: 1;
+      display: block;
+      background: linear-gradient(180deg, rgba(100, 150, 200, 0.15) 0%, rgba(50, 100, 150, 0.15) 100%);
+      cursor: none;
+    }
+
+    .game-over-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .game-over-overlay.active {
+      display: flex;
+    }
+
+    .game-over-card {
+      background: var(--bg-elevated);
+      border: 2px solid var(--border-subtle);
+      border-radius: 1rem;
+      padding: 2rem;
+      text-align: center;
+      max-width: 400px;
+    }
+
+    .game-over-card h2 {
+      font-size: 2rem;
+      margin: 0 0 1rem;
+      color: var(--accent-primary);
+    }
+
+    .final-score {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #2ecc71;
+      margin: 1rem 0;
+    }
+
+    .game-over-card p {
+      color: var(--text-dim);
+      margin: 1rem 0;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+      justify-content: center;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-primary) 0%, #7c3aed 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(159, 122, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border-subtle);
+    }
+
+    @media (max-width: 600px) {
+      .hud {
+        padding: 0.75rem;
+      }
+
+      .hud-stats {
+        gap: 1rem;
+      }
+
+      .stat-value {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+  <script src="js/shared.js" defer></script>
+</head>
+<body>
+  <div class="game-wrapper">
+    <div class="hud">
+      <button class="back-button" onclick="window.history.back()" title="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <div class="hud-title">MULTIPLIER RUNNER</div>
+      <div class="hud-stats">
+        <div class="stat">
+          <div class="stat-label">Crowd</div>
+          <div class="stat-value" id="crowd">1</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Level</div>
+          <div class="stat-value" id="level">1</div>
+        </div>
+      </div>
+    </div>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="game-over-overlay" id="gameOverOverlay">
+    <div class="game-over-card">
+      <h2>Game Over!</h2>
+      <p id="gameOverMessage">You reached the end!</p>
+      <div class="final-score" id="finalScore">0</div>
+      <p id="bestScore"></p>
+      <div class="button-group">
+        <button class="btn btn-primary" onclick="location.reload()">Play Again</button>
+        <button class="btn btn-secondary" onclick="window.history.back()">Back to Hub</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 70; // Account for HUD
+
+    const GAME_ID = 'multiplier-runner';
+    const GATE_WIDTH = 60;
+    const GATE_HEIGHT = 100;
+    const PLAYER_WIDTH = 40;
+    const PLAYER_HEIGHT = 30;
+
+    let gameState = {
+      crowd: 1,
+      level: 1,
+      position: canvas.width / 2,
+      distance: 0,
+      gameActive: true,
+      gameOver: false,
+      finalScore: 0
+    };
+
+    const gates = [];
+    const obstacles = [];
+    let nextGateId = 0;
+    let nextObstacleId = 0;
+
+    // Particle system for visual feedback
+    const particles = [];
+
+    // Load best score
+    function loadBestScore() {
+      if (typeof Scores !== 'undefined') {
+        const record = Scores.get(GAME_ID);
+        if (record && record.score > 0) {
+          return record.score;
+        }
+      }
+      return 0;
+    }
+
+    // Save score
+    function saveScore(score) {
+      if (typeof Scores !== 'undefined') {
+        Scores.set(GAME_ID, score);
+      }
+    }
+
+    // Gate class
+    class Gate {
+      constructor(y, type) {
+        this.id = nextGateId++;
+        this.y = y;
+        this.type = type; // 'multiply' or 'add'
+        this.value = type === 'multiply' ? 2 : 10;
+        this.x = Math.random() * (canvas.width - GATE_WIDTH);
+        this.active = true;
+        
+        if (type === 'multiply') {
+          this.color = '#2ecc71';
+          this.label = `×${this.value}`;
+        } else {
+          this.color = '#3498db';
+          this.label = `+${this.value}`;
+        }
+      }
+
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 15;
+        ctx.fillRect(this.x, this.y, GATE_WIDTH, GATE_HEIGHT);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.font = 'bold 20px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.label, this.x + GATE_WIDTH / 2, this.y + GATE_HEIGHT / 2);
+      }
+
+      checkCollision(px, width) {
+        return px + width > this.x && px < this.x + GATE_WIDTH;
+      }
+    }
+
+    // Obstacle class
+    class Obstacle {
+      constructor(y) {
+        this.id = nextObstacleId++;
+        this.y = y;
+        this.x = Math.random() * (canvas.width - 50);
+        this.width = 50;
+        this.height = 40;
+      }
+
+      draw() {
+        ctx.fillStyle = '#e74c3c';
+        ctx.shadowColor = '#e74c3c';
+        ctx.shadowBlur = 10;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('-50%', this.x + this.width / 2, this.y + this.height / 2);
+      }
+
+      checkCollision(px, width) {
+        return px + width > this.x && px < this.x + this.width;
+      }
+    }
+
+    // Particle for visual effects
+    class Particle {
+      constructor(x, y, text, color) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1;
+        this.vy = -2;
+      }
+
+      update() {
+        this.y += this.vy;
+        this.life -= 0.02;
+      }
+
+      draw() {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 20px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Handle mouse/touch movement
+    document.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      gameState.position = e.clientX - rect.left;
+      gameState.position = Math.max(0, Math.min(canvas.width - PLAYER_WIDTH, gameState.position));
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      gameState.position = touch.clientX - rect.left;
+      gameState.position = Math.max(0, Math.min(canvas.width - PLAYER_WIDTH, gameState.position));
+      e.preventDefault();
+    });
+
+    // Spawn gates
+    function spawnGates() {
+      const lastY = gates.length > 0 ? Math.max(...gates.map(g => g.y)) : -300;
+      for (let i = 0; i < 3; i++) {
+        const y = lastY + 200 + i * 150;
+        const type = Math.random() > 0.5 ? 'multiply' : 'add';
+        gates.push(new Gate(y, type));
+      }
+    }
+
+    // Spawn obstacles
+    function spawnObstacles() {
+      const lastY = obstacles.length > 0 ? Math.max(...obstacles.map(o => o.y)) : -300;
+      if (Math.random() > 0.6) {
+        obstacles.push(new Obstacle(lastY + 250));
+      }
+    }
+
+    // Update game
+    function update() {
+      if (!gameState.gameActive) return;
+
+      gameState.distance += 5;
+      document.getElementById('level').textContent = Math.floor(gameState.distance / 1000) + 1;
+      document.getElementById('crowd').textContent = gameState.crowd;
+
+      // Spawn more gates/obstacles as needed
+      if (gates.length < 5) spawnGates();
+      if (obstacles.length < 3) spawnObstacles();
+
+      // Update gates
+      for (let i = gates.length - 1; i >= 0; i--) {
+        const gate = gates[i];
+        gate.y += 5;
+
+        if (gate.y > canvas.height) {
+          gates.splice(i, 1);
+          continue;
+        }
+
+        // Check collision with player
+        if (gate.y > canvas.height - PLAYER_HEIGHT - 50 && gate.y < canvas.height - PLAYER_HEIGHT + GATE_HEIGHT && gate.checkCollision(gameState.position, PLAYER_WIDTH)) {
+          if (gate.type === 'multiply') {
+            gameState.crowd *= gate.value;
+          } else {
+            gameState.crowd += gate.value;
+          }
+          particles.push(new Particle(gate.x + GATE_WIDTH / 2, gate.y, gate.label, gate.color));
+          gates.splice(i, 1);
+        }
+      }
+
+      // Update obstacles
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obstacle = obstacles[i];
+        obstacle.y += 5;
+
+        if (obstacle.y > canvas.height) {
+          obstacles.splice(i, 1);
+          continue;
+        }
+
+        // Check collision with player
+        if (obstacle.y > canvas.height - PLAYER_HEIGHT - 50 && obstacle.y < canvas.height - PLAYER_HEIGHT + obstacle.height && obstacle.checkCollision(gameState.position, PLAYER_WIDTH)) {
+          gameState.crowd = Math.max(1, Math.floor(gameState.crowd * 0.5));
+          particles.push(new Particle(obstacle.x + obstacle.width / 2, obstacle.y, '-50%', '#e74c3c'));
+          obstacles.splice(i, 1);
+        }
+      }
+
+      // Update particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        if (particles[i].life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+
+      // Win condition - reach distance
+      if (gameState.distance > 5000) {
+        endGame(true);
+      }
+    }
+
+    // Draw game
+    function draw() {
+      // Clear canvas
+      ctx.fillStyle = 'rgba(100, 150, 200, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw grid background
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < canvas.width; i += 60) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+      }
+
+      // Draw gates
+      gates.forEach(gate => gate.draw());
+
+      // Draw obstacles
+      obstacles.forEach(obstacle => obstacle.draw());
+
+      // Draw player (crowd representation)
+      ctx.fillStyle = 'linear-gradient(135deg, #9f7aea 0%, #667eea 100%)';
+      const playerY = canvas.height - PLAYER_HEIGHT - 10;
+      ctx.shadowColor = '#9f7aea';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(gameState.position + PLAYER_WIDTH / 2, playerY + PLAYER_HEIGHT / 2, PLAYER_HEIGHT / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Draw crowd number
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 16px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(gameState.crowd, gameState.position + PLAYER_WIDTH / 2, playerY + PLAYER_HEIGHT / 2);
+
+      // Draw particles
+      particles.forEach(p => p.draw());
+
+      // Draw progress bar
+      ctx.fillStyle = 'rgba(159, 122, 234, 0.3)';
+      ctx.fillRect(0, canvas.height - 5, canvas.width, 5);
+      const progress = Math.min(gameState.distance / 5000, 1);
+      ctx.fillStyle = '#9f7aea';
+      ctx.fillRect(0, canvas.height - 5, canvas.width * progress, 5);
+    }
+
+    function endGame(won) {
+      gameState.gameActive = false;
+      gameState.gameOver = true;
+      gameState.finalScore = gameState.crowd;
+      
+      saveScore(gameState.finalScore);
+      const bestScore = loadBestScore();
+
+      const overlay = document.getElementById('gameOverOverlay');
+      const message = document.getElementById('gameOverMessage');
+      const score = document.getElementById('finalScore');
+      const best = document.getElementById('bestScore');
+
+      if (won) {
+        message.textContent = `You reached the finish line!`;
+      } else {
+        message.textContent = `Your crowd was eliminated!`;
+      }
+      
+      score.textContent = gameState.finalScore;
+      best.textContent = `Best: ${bestScore}`;
+      overlay.classList.add('active');
+    }
+
+    // Game loop
+    function gameLoop() {
+      update();
+      draw();
+      if (gameState.gameActive) {
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // Initial spawn and start
+    spawnGates();
+    spawnObstacles();
+    gameLoop();
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight - 70;
+    });
+  </script>
+</body>
+</html>

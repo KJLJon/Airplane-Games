@@ -1,7 +1,7 @@
 {
   "name": "Airplane Games",
   "short_name": "AirGames",
-  "description": "15 offline games for when you're flying — puzzle, strategy, arcade, and more.",
+  "description": "18 offline games for when you're flying — puzzle, strategy, arcade, and more.",
   "start_url": "/Airplane-Games/",
   "scope": "/Airplane-Games/",
   "display": "standalone",
