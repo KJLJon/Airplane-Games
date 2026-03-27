@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <base href="/airplane-games/">
+  <title>Nonogram — Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body { display:flex; flex-direction:column; height:100dvh; overflow:hidden; background:var(--bg-deep); }
+    .game-header { display:flex; align-items:center; gap:8px; padding:10px 16px; background:var(--bg-panel); border-bottom:1px solid var(--border-subtle); flex-shrink:0; }
+    .game-header h1 { font-family:'Outfit',sans-serif; font-size:1.1rem; color:var(--text-primary); flex:1; margin:0; }
+    .btn { padding:8px 12px; background:var(--bg-card); border:1px solid var(--accent-warm); color:var(--accent-warm); border-radius:8px; cursor:pointer; font-size:0.85rem; min-height:44px; font-family:'Inter',sans-serif; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .btn:hover { background:rgba(247,169,74,0.15); }
+    .game-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:10px; overflow:auto; }
+    .level-info { font-size:0.9rem; color:var(--text-dim); display:flex; gap:16px; }
+    .level-info b { color:var(--accent-warm); }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+    #nonogram-wrap { overflow:auto; max-width:100%; max-height:calc(100vh - 220px); }
+    table { border-collapse:collapse; user-select:none; }
+    td { padding:0; }
+    .clue-cell { padding:2px 4px; font-size:clamp(8px,1.5vw,12px); color:var(--text-dim); text-align:center; vertical-align:bottom; min-width:20px; min-height:20px; font-family:'Outfit',sans-serif; font-weight:700; white-space:nowrap; }
+    .clue-cell.done { color:var(--accent-green); }
+    .clue-cell.col { vertical-align:bottom; text-align:center; writing-mode:horizontal-tb; }
+    .game-cell { width:clamp(18px,4.5vw,32px); height:clamp(18px,4.5vw,32px); border:1px solid rgba(255,255,255,0.1); cursor:pointer; background:var(--bg-card); transition:background 0.1s; }
+    .game-cell.filled { background:var(--accent-primary); border-color:var(--accent-primary); }
+    .game-cell.marked { background:transparent; border-color:rgba(255,255,255,0.2); }
+    .game-cell.marked::after { content:'✕'; display:flex; align-items:center; justify-content:center; width:100%; height:100%; font-size:0.7em; color:var(--text-dim); }
+    .game-cell:hover { background:rgba(124,106,247,0.3); }
+    .game-cell.filled:hover { background:var(--accent-primary); opacity:0.8; }
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100; align-items:center; justify-content:center; }
+    .modal.show { display:flex; }
+    .modal-box { background:var(--bg-panel); border:1px solid var(--border-subtle); border-radius:16px; padding:28px; text-align:center; max-width:300px; width:90%; }
+    .modal-box h2 { font-family:'Outfit',sans-serif; font-size:1.6rem; margin:0 0 10px; }
+    .level-grid { display:flex; gap:4px; flex-wrap:wrap; max-width:300px; justify-content:center; }
+    .lv-dot { width:20px; height:20px; border-radius:4px; border:1px solid var(--border-subtle); background:var(--bg-card); cursor:pointer; font-size:0.6rem; display:flex; align-items:center; justify-content:center; color:var(--text-dim); }
+    .lv-dot.done { background:var(--accent-green); color:#fff; }
+    .lv-dot.current { border-color:var(--accent-warm); }
+  </style>
+</head>
+<body>
+  <div class="game-header">
+    <a href="/airplane-games/" class="btn btn-back">← Hub</a>
+    <h1>Nonogram</h1>
+  </div>
+  <div class="game-body">
+    <div class="level-info">
+      <span>Level <b id="lv-num">1</b></span>
+      <span>Size: <b id="lv-size">10×10</b></span>
+      <span>Done: <b id="lv-done">0</b>/20</span>
+    </div>
+    <div class="controls">
+      <button class="btn" id="prevBtn">← Prev</button>
+      <button class="btn" id="checkBtn">✓ Check</button>
+      <button class="btn" id="clearBtn">Clear</button>
+      <button class="btn" id="nextBtn">Next →</button>
+    </div>
+    <div id="nonogram-wrap"><table id="grid"></table></div>
+    <div class="level-grid" id="level-grid"></div>
+  </div>
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <h2>Solved! 🎉</h2>
+      <p id="modal-msg"></p>
+      <button class="btn" id="modal-next" style="width:100%;margin-bottom:8px;">Next Level →</button>
+      <a href="/airplane-games/" class="btn" style="display:block;text-align:center;">← Hub</a>
+    </div>
+  </div>
+  <script src="js/shared.js"></script>
+  <script>
+  // 20 handcrafted 10x10 puzzles
+  const PUZZLES_10 = [
+    // Airplane
+    [[0,0,0,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,1,0,0],[0,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,1,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,0,0,0,0],[0,0,0,1,1,1,1,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Heart
+    [[0,1,1,0,0,0,1,1,0,0],[1,1,1,1,0,1,1,1,1,0],[1,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,1,0],[0,1,1,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Arrow
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,0,0,0,0,0],[0,0,1,1,1,0,0,0,0,0],[0,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,1,1,0],[0,0,1,1,1,0,0,0,0,0],[0,0,0,1,1,0,0,0,0,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Star
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[1,1,1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,1,1,0],[0,0,1,1,1,1,1,1,0,0],[0,1,1,0,1,1,0,1,1,0],[1,1,0,0,0,0,0,0,1,1],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // House
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,1,0],[1,1,0,0,1,1,0,0,1,0],[1,1,0,0,1,1,0,0,1,0],[1,1,0,0,1,1,0,0,1,0],[1,1,1,1,1,1,1,1,1,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Letter A
+    [[0,0,0,1,1,0,0,0,0,0],[0,0,1,1,1,1,0,0,0,0],[0,1,1,0,1,1,1,0,0,0],[1,1,0,0,0,1,1,1,0,0],[1,1,1,1,1,1,1,1,0,0],[1,1,0,0,0,0,1,1,0,0],[1,1,0,0,0,0,1,1,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Diamond
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,1,0],[0,1,1,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Cross
+    [[0,0,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,0,0,0,0],[1,1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1,1],[0,0,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,0,0,0,0],[0,0,0,0,1,1,0,0,0,0]],
+    // Smiley
+    [[0,0,1,1,1,1,1,1,0,0],[0,1,1,0,0,0,0,1,1,0],[1,1,0,1,0,0,1,0,1,1],[1,0,0,0,0,0,0,0,0,1],[1,0,1,0,0,0,0,1,0,1],[1,0,0,0,0,0,0,0,0,1],[1,1,0,1,1,1,1,0,1,1],[0,1,1,0,0,0,0,1,1,0],[0,0,1,1,1,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Mountain
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,1,1,0,1,0,1,1,0,0],[1,1,0,0,1,0,0,1,1,0],[1,0,0,0,1,0,0,0,1,0],[1,0,0,0,1,0,0,0,1,0],[1,1,1,1,1,1,1,1,1,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Tree
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,1,0],[0,0,1,1,1,1,1,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0]],
+    // Fish
+    [[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,1,1,0],[0,0,0,0,0,0,1,0,1,0],[1,1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,0,0],[0,0,0,0,0,0,1,0,1,0],[0,0,0,0,0,0,0,1,1,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Rocket
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,1,1,1,1,1,1,1,0,0],[1,0,0,1,1,1,0,0,1,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Cat
+    [[1,0,0,0,0,0,0,0,1,0],[1,1,0,0,0,0,0,1,1,0],[0,1,1,1,1,1,1,1,0,0],[0,1,1,0,1,1,0,1,0,0],[0,1,1,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,1,0,0,0,1,0,0,0],[0,1,1,0,0,0,1,1,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Umbrella
+    [[0,0,0,1,1,1,0,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,1,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,0,0,0,0,0],[0,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Clock
+    [[0,0,1,1,1,1,1,0,0,0],[0,1,1,0,0,0,1,1,0,0],[1,1,0,0,0,0,0,1,1,0],[1,0,0,0,1,0,0,0,1,0],[1,0,0,0,1,1,0,0,1,0],[1,0,0,0,1,1,0,0,1,0],[1,1,0,0,0,0,0,1,1,0],[0,1,1,0,0,0,1,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Ship
+    [[0,0,0,0,1,0,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,1,0],[0,1,1,1,1,1,1,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Butterfly
+    [[1,1,0,0,0,0,0,1,1,0],[1,1,1,0,0,0,1,1,1,0],[0,1,1,1,0,1,1,1,0,0],[0,0,1,1,1,1,1,0,0,0],[0,0,0,1,1,1,0,0,0,0],[0,0,1,1,1,1,1,0,0,0],[0,1,1,1,0,1,1,1,0,0],[1,1,1,0,0,0,1,1,1,0],[1,1,0,0,0,0,0,1,1,0],[0,0,0,0,0,0,0,0,0,0]],
+    // Mountain range
+    [[0,0,0,0,0,0,0,0,1,0],[0,0,0,0,0,0,0,1,1,1],[0,0,0,0,0,1,0,1,0,1],[0,0,0,0,1,1,1,1,0,1],[0,0,0,1,0,1,0,1,0,1],[0,0,1,1,0,1,0,1,0,1],[0,1,0,1,0,1,0,1,0,1],[1,1,0,1,0,1,0,1,0,1],[1,0,0,1,0,1,0,1,0,1],[1,1,1,1,1,1,1,1,1,1]],
+    // Crown
+    [[1,0,0,0,0,0,0,0,1,0],[1,0,0,1,0,1,0,0,1,0],[1,0,1,1,0,1,1,0,1,0],[1,1,1,0,0,0,1,1,1,0],[1,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,1,0],[0,1,1,1,1,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0]]
+  ];
+
+  function getClues(grid) {
+    const rows = grid.map(row => {
+      const clues=[]; let c=0;
+      for(const v of row){if(v)c++;else if(c){clues.push(c);c=0;}}
+      if(c)clues.push(c);
+      return clues.length?clues:[0];
+    });
+    const cols = [];
+    for(let f=0;f<grid[0].length;f++){
+      const clues=[]; let c=0;
+      for(let r=0;r<grid.length;r++){if(grid[r][f])c++;else if(c){clues.push(c);c=0;}}
+      if(c)clues.push(c);
+      cols.push(clues.length?clues:[0]);
+    }
+    return {rows,cols};
+  }
+
+  let levelIdx=0, puzzle=null, userGrid=[], rowClues=[], colClues=[];
+  let completed=JSON.parse(localStorage.getItem('ag_nono_done')||'[]');
+  let dragging=false, dragVal=0;
+
+  function loadLevel(idx) {
+    levelIdx=idx;
+    puzzle=PUZZLES_10[idx%PUZZLES_10.length];
+    const {rows,cols}=getClues(puzzle);
+    rowClues=rows; colClues=cols;
+    userGrid=puzzle.map(r=>r.map(()=>0)); // 0=empty,1=filled,2=marked
+    document.getElementById('lv-num').textContent=idx+1;
+    document.getElementById('lv-size').textContent=puzzle.length+'×'+puzzle[0].length;
+    document.getElementById('lv-done').textContent=completed.length;
+    document.getElementById('modal').classList.remove('show');
+    renderGrid();
+    renderLevelSelect();
+  }
+
+  function renderGrid() {
+    const R=puzzle.length,C=puzzle[0].length;
+    const maxColClue=Math.max(...colClues.map(c=>c.length));
+    const maxRowClue=Math.max(...rowClues.map(c=>c.length));
+    const table=document.getElementById('grid');
+    table.innerHTML='';
+
+    // Header rows (col clues)
+    for(let hrow=0;hrow<maxColClue;hrow++){
+      const tr=document.createElement('tr');
+      // Empty corner cells
+      for(let i=0;i<maxRowClue;i++){const td=document.createElement('td');tr.appendChild(td);}
+      // Col clue cells
+      for(let c=0;c<C;c++){
+        const td=document.createElement('td');
+        const clue=colClues[c];
+        const offset=maxColClue-clue.length;
+        td.className='clue-cell col';
+        td.textContent=hrow>=offset?clue[hrow-offset]:'';
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+
+    // Data rows
+    for(let r=0;r<R;r++){
+      const tr=document.createElement('tr');
+      // Row clues
+      const clue=rowClues[r];
+      const offset=maxRowClue-clue.length;
+      for(let i=0;i<maxRowClue;i++){
+        const td=document.createElement('td');
+        td.className='clue-cell';
+        td.textContent=i>=offset?clue[i-offset]:'';
+        tr.appendChild(td);
+      }
+      // Game cells
+      for(let c=0;c<C;c++){
+        const td=document.createElement('td');
+        const v=userGrid[r][c];
+        td.className='game-cell'+(v===1?' filled':v===2?' marked':'');
+        td.dataset.r=r; td.dataset.c=c;
+        td.addEventListener('mousedown',e=>{e.preventDefault();startDrag(r,c);});
+        td.addEventListener('mouseover',()=>{ if(dragging) doDrag(r,c); });
+        td.addEventListener('touchstart',e=>{e.preventDefault();startDrag(r,c);},{passive:false});
+        td.addEventListener('touchmove',e=>{
+          e.preventDefault();
+          const t=e.touches[0];
+          const el=document.elementFromPoint(t.clientX,t.clientY);
+          if(el&&el.dataset.r!==undefined) doDrag(parseInt(el.dataset.r),parseInt(el.dataset.c));
+        },{passive:false});
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+  }
+
+  function startDrag(r,c) {
+    dragging=true;
+    const v=userGrid[r][c];
+    dragVal=v===0?1:v===1?2:0;
+    doDrag(r,c);
+  }
+
+  function doDrag(r,c) {
+    if(!dragging) return;
+    userGrid[r][c]=dragVal;
+    renderGrid();
+  }
+
+  document.addEventListener('mouseup',()=>dragging=false);
+  document.addEventListener('touchend',()=>dragging=false);
+
+  function checkSolved() {
+    for(let r=0;r<puzzle.length;r++) for(let c=0;c<puzzle[0].length;c++) {
+      if((userGrid[r][c]===1?1:0)!==puzzle[r][c]) return false;
+    }
+    return true;
+  }
+
+  function renderLevelSelect() {
+    const el=document.getElementById('level-grid');
+    el.innerHTML='';
+    for(let i=0;i<20;i++){
+      const d=document.createElement('div');
+      d.className='lv-dot'+(completed.includes(i)?' done':'')+(i===levelIdx?' current':'');
+      d.textContent=i+1;
+      d.addEventListener('click',()=>loadLevel(i));
+      el.appendChild(d);
+    }
+  }
+
+  document.getElementById('checkBtn').addEventListener('click',()=>{
+    if(checkSolved()){
+      if(!completed.includes(levelIdx)){
+        completed.push(levelIdx);
+        localStorage.setItem('ag_nono_done',JSON.stringify(completed));
+        Scores.set('nonogram',completed.length);
+      }
+      document.getElementById('modal-msg').textContent=`Level ${levelIdx+1} complete! (${completed.length}/20 done)`;
+      document.getElementById('modal').classList.add('show');
+      renderLevelSelect();
+      document.getElementById('lv-done').textContent=completed.length;
+    } else {
+      showToast('Not quite right — keep trying!');
+    }
+  });
+
+  document.getElementById('clearBtn').addEventListener('click',()=>{
+    userGrid=puzzle.map(r=>r.map(()=>0));
+    renderGrid();
+  });
+
+  document.getElementById('prevBtn').addEventListener('click',()=>{ if(levelIdx>0) loadLevel(levelIdx-1); });
+  document.getElementById('nextBtn').addEventListener('click',()=>{ if(levelIdx<19) loadLevel(levelIdx+1); });
+  document.getElementById('modal-next').addEventListener('click',()=>{
+    document.getElementById('modal').classList.remove('show');
+    if(levelIdx<19) loadLevel(levelIdx+1);
+  });
+
+  loadLevel(0);
+  </script>
+</body>
+</html>

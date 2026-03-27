@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="description" content="15 offline airplane games — no wifi needed. Install as a PWA on Android.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <base href="/airplane-games/">
+  <title>Airplane Games</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="js/shared.js" defer></script>
+
+  <style>
+    /* ── Hub-specific styles ─────────────────────────────────── */
+
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Stars background ──────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 30% 40%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 55% 10%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 72% 60%, rgba(255,255,255,0.25) 0%, transparent 100%),
+        radial-gradient(1px 1px at 88% 25%, rgba(255,255,255,0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 20% 75%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 65% 85%, rgba(255,255,255,0.35) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45% 55%, rgba(255,255,255,0.2) 0%, transparent 100%),
+        radial-gradient(1px 1px at 92% 78%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 5%  90%, rgba(255,255,255,0.3) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    main, header, footer { position: relative; z-index: 1; }
+
+    /* ── Header ────────────────────────────────────────────── */
+    .hub-header {
+      text-align: center;
+      padding: 2.5rem 1rem 2rem;
+      background: linear-gradient(180deg, rgba(26,26,46,0.95) 0%, transparent 100%);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .hub-title-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .hub-plane-icon {
+      width: 2.4rem;
+      height: 2.4rem;
+      flex-shrink: 0;
+    }
+
+    .hub-title {
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-size: clamp(1.9rem, 5.5vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      background: linear-gradient(135deg, #f0f0f5 30%, var(--accent-primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0;
+      line-height: 1.1;
+    }
+
+    .hub-tagline {
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-size: clamp(0.95rem, 2.2vw, 1.1rem);
+      font-weight: 600;
+      color: var(--accent-warm);
+      margin: 0.55rem 0 0;
+      letter-spacing: 0.01em;
+    }
+
+    .hub-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      margin: 0.3rem 0 0;
+      opacity: 0.75;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Install button ────────────────────────────────────── */
+    #install-btn {
+      display: none;
+      margin: 1.2rem auto 0;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.6rem 1.5rem;
+      background: transparent;
+      border: 1.5px solid var(--accent-primary);
+      color: var(--accent-primary);
+      border-radius: 2rem;
+      font-size: 0.88rem;
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: background var(--transition-base), box-shadow var(--transition-base);
+    }
+
+    #install-btn:hover {
+      background: var(--glow-purple);
+      box-shadow: 0 0 16px rgba(124,106,247,0.35);
+    }
+
+    #install-btn:active {
+      transform: scale(0.97);
+    }
+
+    #install-btn svg {
+      width: 1rem;
+      height: 1rem;
+      fill: currentColor;
+    }
+
+    /* ── Games grid ─────────────────────────────────────────── */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      padding: 1.5rem 1rem;
+      max-width: 960px;
+      margin: 0 auto;
+      flex: 1;
+    }
+
+    /* Tablet */
+    @media (max-width: 680px) {
+      .games-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.8rem;
+        padding: 1rem 0.75rem;
+      }
+    }
+
+    /* Mobile */
+    @media (max-width: 400px) {
+      .games-grid {
+        grid-template-columns: 1fr;
+        gap: 0.7rem;
+        padding: 0.75rem;
+      }
+    }
+
+    /* ── Game card ──────────────────────────────────────────── */
+    .game-card {
+      --card-accent: var(--accent-primary);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-top: 3px solid var(--card-accent);
+      border-radius: var(--radius-lg);
+      padding: 1.1rem 1rem 0.9rem;
+      text-decoration: none;
+      overflow: hidden;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+      cursor: pointer;
+    }
+
+    /* Subtle top-left glow matching card accent */
+    .game-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse at top left, var(--card-accent), transparent 65%);
+      opacity: 0;
+      transition: opacity var(--transition-base);
+      pointer-events: none;
+    }
+
+    .game-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.45), 0 0 0 1px var(--card-accent);
+      border-color: var(--card-accent);
+    }
+
+    .game-card:hover::before {
+      opacity: 0.08;
+    }
+
+    .game-card:active {
+      transform: translateY(-1px);
+    }
+
+    /* ── Card icon ──────────────────────────────────────────── */
+    .card-icon {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 0.7rem;
+      flex-shrink: 0;
+      color: var(--card-accent);
+    }
+
+    .card-icon svg {
+      width: 1.4rem;
+      height: 1.4rem;
+      margin: auto;
+      fill: var(--card-accent);
+      flex-shrink: 0;
+    }
+
+    /* ── Card text ──────────────────────────────────────────── */
+    .card-title {
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0 0 0.3rem;
+      line-height: 1.2;
+    }
+
+    .card-badge {
+      display: inline-block;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding: 0.18rem 0.55rem;
+      border-radius: 1rem;
+      border: 1px solid var(--card-accent);
+      color: var(--card-accent);
+      background: rgba(255,255,255,0.04);
+      margin-bottom: 0.45rem;
+      line-height: 1.4;
+    }
+
+    .card-desc {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      line-height: 1.45;
+      margin: 0;
+      flex: 1;
+    }
+
+    .card-score {
+      margin-top: 0.65rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--accent-warm);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .card-score--empty {
+      color: var(--text-dim);
+      font-weight: 400;
+      opacity: 0.6;
+    }
+
+    .card-score svg {
+      width: 0.75rem;
+      height: 0.75rem;
+      fill: var(--accent-warm);
+      flex-shrink: 0;
+    }
+
+    .card-score--empty svg {
+      fill: var(--text-dim);
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .hub-footer {
+      text-align: center;
+      padding: 1.5rem 1rem 2rem;
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      opacity: 0.55;
+      border-top: 1px solid var(--border-subtle);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ───────────────────────────────────────────── -->
+  <header class="hub-header">
+    <div class="hub-title-wrap">
+      <!-- Airplane icon -->
+      <svg class="hub-plane-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 24L44 8L32 24L44 40L4 24Z" fill="url(#planeGrad)"/>
+        <path d="M4 24L20 28V36L26 30" fill="rgba(255,255,255,0.3)"/>
+        <defs>
+          <linearGradient id="planeGrad" x1="4" y1="8" x2="44" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#7c6af7"/>
+            <stop offset="100%" stop-color="#f7a94a"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <h1 class="hub-title">AIRPLANE GAMES</h1>
+    </div>
+    <p class="hub-tagline">15 games for offline play</p>
+    <p class="hub-subtitle">No wifi needed&nbsp;&nbsp;·&nbsp;&nbsp;Install on Android</p>
+
+    <button id="install-btn" aria-label="Install Airplane Games as an app">
+      <!-- Download arrow icon -->
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M10 2v10M6 8l4 4 4-4M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      Install App
+    </button>
+  </header>
+
+  <!-- ── Game grid ─────────────────────────────────────────── -->
+  <main>
+    <div class="games-grid" id="games-grid">
+      <!-- Cards are injected by JavaScript below -->
+    </div>
+  </main>
+
+  <footer class="hub-footer">
+    <p>All 15 games run 100% offline &nbsp;·&nbsp; No ads &nbsp;·&nbsp; No tracking</p>
+  </footer>
+
+  <!-- ── Scripts ───────────────────────────────────────────── -->
+  <script>
+    /* ── PWA Install flow ─────────────────────────────────── */
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('install-btn').style.display = 'flex';
+    });
+
+    document.getElementById('install-btn').addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    });
+
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('install-btn').style.display = 'none';
+    });
+
+    /* ── Service Worker registration ──────────────────────── */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/airplane-games/sw.js', { scope: '/airplane-games/' })
+        .then(reg => console.log('[SW] registered, scope:', reg.scope))
+        .catch(err => console.warn('[SW] registration failed:', err));
+    }
+
+    /* ── Game catalogue ───────────────────────────────────── */
+    const GAMES = [
+      {
+        id: 'tetris',
+        title: 'Tetris',
+        badge: 'Endless',
+        desc: 'Stack and clear lines before they reach the top',
+        path: 'games/tetris/',
+        accent: '#e74c3c',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2" y="10" width="5" height="5" rx="1"/>
+          <rect x="7" y="10" width="5" height="5" rx="1"/>
+          <rect x="12" y="10" width="5" height="5" rx="1"/>
+          <rect x="7" y="5" width="5" height="5" rx="1"/>
+        </svg>`,
+      },
+      {
+        id: 'sudoku',
+        title: 'Sudoku',
+        badge: 'Puzzle',
+        desc: 'Fill the 9×9 grid with no repeating digits',
+        path: 'games/sudoku/',
+        accent: '#3498db',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2" y="2" width="6" height="6" rx="1"/>
+          <rect x="9" y="2" width="6" height="6" rx="1"/>
+          <rect x="16" y="2" width="6" height="6" rx="1"/>
+          <rect x="2" y="9" width="6" height="6" rx="1"/>
+          <rect x="16" y="9" width="6" height="6" rx="1"/>
+          <rect x="2" y="16" width="6" height="6" rx="1"/>
+          <rect x="9" y="16" width="6" height="6" rx="1"/>
+          <rect x="16" y="16" width="6" height="6" rx="1"/>
+        </svg>`,
+      },
+      {
+        id: 'runner',
+        title: 'Endless Runner',
+        badge: 'Endless',
+        desc: 'Jump, duck, and dodge to stay alive',
+        path: 'games/runner/',
+        accent: '#e67e22',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="14" cy="4" r="2"/>
+          <path d="M10 8l4 2 2 4-2 1-1-3-3-1-2 6H6l2-5-2-2 1-2 3 1z" stroke-linejoin="round"/>
+          <path d="M8 17l-1 5M13 17l2 5" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <rect x="2" y="22" width="20" height="1.5" rx="0.75"/>
+        </svg>`,
+      },
+      {
+        id: 'chess-puzzles',
+        title: 'Chess Puzzles',
+        badge: 'Strategy',
+        desc: 'Solve 100 mate-in-N chess puzzles',
+        path: 'games/chess-puzzles/',
+        accent: '#95a5a6',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 4h6M12 4v3M9 7h6l1 2H8l1-2zM7 14h10l1 4H6l1-4zM8 14V9h2v5M14 14V9h2v5"/>
+          <rect x="5" y="18" width="14" height="2.5" rx="1"/>
+        </svg>`,
+      },
+      {
+        id: 'sliding-puzzle',
+        title: 'Sliding Puzzle',
+        badge: 'Puzzle',
+        desc: 'Slide tiles into order',
+        path: 'games/sliding-puzzle/',
+        accent: '#9b59b6',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2"  y="2"  width="6.5" height="6.5" rx="1"/>
+          <rect x="9.75" y="2" width="6.5" height="6.5" rx="1"/>
+          <rect x="2"  y="9.75" width="6.5" height="6.5" rx="1"/>
+          <rect x="9.75" y="9.75" width="6.5" height="6.5" rx="1"/>
+          <rect x="17.5" y="9.75" width="4.5" height="6.5" rx="1" opacity="0.4"/>
+          <rect x="17.5" y="2" width="4.5" height="6.5" rx="1"/>
+        </svg>`,
+      },
+      {
+        id: 'snake',
+        title: 'Snake',
+        badge: 'Endless',
+        desc: 'Eat, grow, and don\'t bite yourself',
+        path: 'games/snake/',
+        accent: '#2ecc71',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 18 Q4 8 12 8 Q20 8 20 14 Q20 18 16 18 Q12 18 12 14" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+          <circle cx="20.5" cy="10.5" r="1.5"/>
+        </svg>`,
+      },
+      {
+        id: 'traffic',
+        title: 'Traffic Director',
+        badge: 'Strategy',
+        desc: 'Guide vehicles through busy intersections',
+        path: 'games/traffic/',
+        accent: '#f39c12',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="9" y="2" width="6" height="20" rx="3"/>
+          <circle cx="12" cy="6"  r="1.8" fill="var(--bg-deep)" opacity="0.7"/>
+          <circle cx="12" cy="12" r="1.8" fill="var(--bg-deep)" opacity="0.7"/>
+          <circle cx="12" cy="18" r="1.8" fill="var(--bg-deep)" opacity="0.7"/>
+          <line x1="2" y1="12" x2="9" y2="12" stroke-width="1.5"/>
+          <line x1="15" y1="12" x2="22" y2="12" stroke-width="1.5"/>
+        </svg>`,
+      },
+      {
+        id: 'minesweeper',
+        title: 'Minesweeper',
+        badge: 'Puzzle',
+        desc: 'Reveal safe cells, flag the mines',
+        path: 'games/minesweeper/',
+        accent: '#1abc9c',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="6"/>
+          <line x1="12" y1="2"  x2="12" y2="5"  stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="19" x2="12" y2="22" stroke-width="2" stroke-linecap="round"/>
+          <line x1="2"  y1="12" x2="5"  y2="12" stroke-width="2" stroke-linecap="round"/>
+          <line x1="19" y1="12" x2="22" y2="12" stroke-width="2" stroke-linecap="round"/>
+          <line x1="5"  y1="5"  x2="7"  y2="7"  stroke-width="2" stroke-linecap="round"/>
+          <line x1="17" y1="17" x2="19" y2="19" stroke-width="2" stroke-linecap="round"/>
+          <line x1="19" y1="5"  x2="17" y2="7"  stroke-width="2" stroke-linecap="round"/>
+          <line x1="5"  y1="19" x2="7"  y2="17" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="2.5" fill="var(--bg-deep)"/>
+        </svg>`,
+      },
+      {
+        id: 'wordle',
+        title: 'Wordle',
+        badge: 'Puzzle',
+        desc: 'Guess the 5-letter word in 6 tries',
+        path: 'games/wordle/',
+        accent: '#27ae60',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2"  y="2"  width="4" height="4" rx="0.8"/>
+          <rect x="7"  y="2"  width="4" height="4" rx="0.8"/>
+          <rect x="12" y="2"  width="4" height="4" rx="0.8"/>
+          <rect x="17" y="2"  width="4" height="4" rx="0.8" opacity="0.35"/>
+          <rect x="2"  y="7"  width="4" height="4" rx="0.8" opacity="0.35"/>
+          <rect x="7"  y="7"  width="4" height="4" rx="0.8"/>
+          <rect x="12" y="7"  width="4" height="4" rx="0.8" opacity="0.35"/>
+          <rect x="17" y="7"  width="4" height="4" rx="0.8"/>
+          <rect x="2"  y="12" width="4" height="4" rx="0.8" opacity="0.35"/>
+          <rect x="7"  y="12" width="4" height="4" rx="0.8" opacity="0.35"/>
+          <rect x="12" y="12" width="4" height="4" rx="0.8" opacity="0.35"/>
+          <rect x="17" y="12" width="4" height="4" rx="0.8" opacity="0.35"/>
+        </svg>`,
+      },
+      {
+        id: '2048',
+        title: '2048',
+        badge: 'Puzzle',
+        desc: 'Merge tiles to reach 2048 and beyond',
+        path: 'games/2048/',
+        accent: '#d35400',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2"  y="2"  width="9"  height="9"  rx="1.5"/>
+          <rect x="13" y="2"  width="9"  height="9"  rx="1.5" opacity="0.6"/>
+          <rect x="2"  y="13" width="9"  height="9"  rx="1.5" opacity="0.6"/>
+          <rect x="13" y="13" width="9"  height="9"  rx="1.5"/>
+        </svg>`,
+      },
+      {
+        id: 'dogfight',
+        title: 'Dogfight',
+        badge: 'Action',
+        desc: 'Physics aerial combat — shoot them all down',
+        path: 'games/dogfight/',
+        accent: '#2980b9',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 12 L18 6 L14 12 L18 18 Z"/>
+          <path d="M14 12 L10 9 L10 15 Z" opacity="0.5"/>
+          <circle cx="20" cy="5" r="1.5" opacity="0.7"/>
+          <circle cx="21" cy="9" r="1" opacity="0.5"/>
+          <line x1="14" y1="11" x2="20" y2="6" stroke-width="1" stroke-dasharray="2 2" fill="none"/>
+        </svg>`,
+      },
+      {
+        id: 'maze',
+        title: 'Cloud Maze',
+        badge: 'Puzzle',
+        desc: 'Navigate fog-filled procedural mazes',
+        path: 'games/maze/',
+        accent: '#8e44ad',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 2 h5 v5 h-5 Z" fill="none" stroke-width="1.5"/>
+          <path d="M2 2 h20" stroke-width="1.5" fill="none"/>
+          <path d="M22 2 v20" stroke-width="1.5" fill="none"/>
+          <path d="M2 22 h20" stroke-width="1.5" fill="none"/>
+          <path d="M2 2 v12" stroke-width="1.5" fill="none"/>
+          <path d="M7 7 v8 h7" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M14 7 h5 v8 h-5 v5" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <circle cx="4" cy="4" r="1.2"/>
+          <circle cx="20" cy="20" r="1.2" opacity="0.5"/>
+        </svg>`,
+      },
+      {
+        id: 'stratego',
+        title: 'Stratego Lite',
+        badge: 'Strategy',
+        desc: 'Hidden piece battle strategy vs AI',
+        path: 'games/stratego/',
+        accent: '#c0392b',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2"  y="14" width="4.5" height="5" rx="1"/>
+          <rect x="7.5" y="11" width="4.5" height="8" rx="1"/>
+          <rect x="13" y="8"  width="4.5" height="11" rx="1"/>
+          <rect x="18.5" y="5" width="4.5" height="14" rx="1" opacity="0.7"/>
+          <path d="M12 2 L14 6 L10 6 Z"/>
+        </svg>`,
+      },
+      {
+        id: 'nonogram',
+        title: 'Flight Nonogram',
+        badge: 'Puzzle',
+        desc: 'Solve pixel art picross puzzles',
+        path: 'games/nonogram/',
+        accent: '#16a085',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="7" y="7"   width="4" height="4" rx="0.5"/>
+          <rect x="13" y="7"  width="4" height="4" rx="0.5"/>
+          <rect x="7" y="13"  width="4" height="4" rx="0.5"/>
+          <rect x="13" y="13" width="4" height="4" rx="0.5" opacity="0.35"/>
+          <line x1="2"  y1="7"  x2="5"  y2="7"  stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2"  y1="11" x2="5"  y2="11" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2"  y1="13" x2="5"  y2="13" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2"  y1="17" x2="5"  y2="17" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="7"  y1="2"  x2="7"  y2="5"  stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="11" y1="2"  x2="11" y2="5"  stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="13" y1="2"  x2="13" y2="5"  stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="17" y1="2"  x2="17" y2="5"  stroke-width="1.5" stroke-linecap="round"/>
+        </svg>`,
+      },
+      {
+        id: 'flapper',
+        title: 'Jet Stream',
+        badge: 'Endless',
+        desc: 'Tap to fly through oncoming clouds',
+        path: 'games/flapper/',
+        accent: '#2471a3',
+        icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 13 Q6 11 10 13 Q14 15 18 13 Q20 12 22 13" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5"/>
+          <path d="M2 17 Q6 15 10 17 Q14 19 18 17 Q20 16 22 17" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.3"/>
+          <path d="M3 9 L14 6 L11 10 L14 14 Z"/>
+          <path d="M11 10 L8 8.5 L8 11.5 Z" opacity="0.5"/>
+        </svg>`,
+      },
+    ];
+
+    /* ── Score formatting ──────────────────────────────────── */
+    function formatScore(score) {
+      if (typeof score !== 'number' || !isFinite(score)) return String(score);
+      if (score >= 1_000_000) return (score / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (score >= 1_000)     return (score / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+      return String(score);
+    }
+
+    /* Trophy icon (inline, reused per card) */
+    const TROPHY_SVG = `<svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 2h8v5a4 4 0 01-8 0V2z"/>
+      <path d="M2 2h2v3a1 1 0 01-2 0V2zM12 2h2v3a1 1 0 01-2 0V2z" opacity="0.6"/>
+      <path d="M6 11v1.5M10 11v1.5M5 13.5h6" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+    </svg>`;
+
+    const DASH_SVG = `<svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 8h8" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5"/>
+    </svg>`;
+
+    /* ── Build grid ────────────────────────────────────────── */
+    function buildGrid() {
+      // shared.js loaded deferred — wait for it if needed
+      const scores = (typeof Scores !== 'undefined') ? Scores.getAll() : {};
+      const grid = document.getElementById('games-grid');
+
+      grid.innerHTML = GAMES.map(game => {
+        const record = scores[game.id];
+        let scoreHtml;
+
+        if (record && typeof record.score === 'number') {
+          scoreHtml = `<div class="card-score">
+            ${TROPHY_SVG}
+            Best:&nbsp;<strong>${formatScore(record.score)}</strong>
+          </div>`;
+        } else {
+          scoreHtml = `<div class="card-score card-score--empty">
+            ${DASH_SVG}
+            No score yet
+          </div>`;
+        }
+
+        return `<a
+          class="game-card"
+          href="${game.path}"
+          style="--card-accent: ${game.accent}"
+          aria-label="Play ${game.title}"
+        >
+          <span class="card-icon" aria-hidden="true">${game.icon}</span>
+          <div class="card-title">${game.title}</div>
+          <span class="card-badge">${game.badge}</span>
+          <p class="card-desc">${game.desc}</p>
+          ${scoreHtml}
+        </a>`;
+      }).join('\n');
+    }
+
+    /* Run immediately — shared.js is defer so we wait for DOMContentLoaded */
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', buildGrid);
+    } else {
+      buildGrid();
+    }
+  </script>
+</body>
+</html>

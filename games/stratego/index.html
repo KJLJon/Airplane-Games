@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <base href="/airplane-games/">
+  <title>Stratego Lite – Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body { display:flex; flex-direction:column; height:100dvh; overflow:hidden; background:#0a0a12; }
+    .game-header { flex-shrink:0; }
+    #game-area { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    #status-bar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:4px 12px; background:rgba(22,22,28,0.95);
+      border-bottom:1px solid rgba(255,255,255,0.07);
+      font-size:12px; color:#888899; flex-shrink:0;
+    }
+    #status-bar .turn-ind { font-weight:700; font-size:13px; color:#f0f0f5; }
+    #status-bar .msg { color:#f7a94a; font-size:12px; }
+    #board-container {
+      flex:1; overflow:auto; display:flex; align-items:center;
+      justify-content:center; padding:8px;
+    }
+    #board {
+      display:grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap:2px; padding:6px;
+      background:#1a1a28;
+      border-radius:10px;
+      border:2px solid rgba(255,255,255,0.1);
+    }
+    .cell {
+      width:42px; height:42px; border-radius:5px;
+      background:#0f0f1c;
+      border:1px solid rgba(255,255,255,0.06);
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; position:relative; font-size:10px;
+      user-select:none; -webkit-tap-highlight-color:transparent;
+      transition:background 0.1s, box-shadow 0.1s;
+    }
+    .cell:hover { background:#1a1a2c; }
+    .cell.selected { box-shadow:0 0 0 2px #7c6af7; background:#1e1828; }
+    .cell.valid-move { box-shadow:0 0 0 2px rgba(46,204,113,0.7); background:#0a1a10; }
+    .cell.valid-move:hover { background:#0f2015; }
+    /* Pieces */
+    .piece {
+      width:36px; height:36px; border-radius:4px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      font-size:9px; font-weight:700; font-family:'Outfit',sans-serif;
+      line-height:1.1; text-align:center; pointer-events:none;
+      position:relative;
+    }
+    .piece.player { background:#1a3a6a; border:1px solid #4a7aff; color:#a0c4ff; }
+    .piece.ai     { background:#3a1010; border:1px solid #c04040; color:#ff9090; }
+    .piece.ai.hidden-piece { background:#3a1010; border:1px solid #c04040; }
+    .piece.ai.hidden-piece::before { content:'?'; font-size:14px; color:#ff6060; }
+    .piece .rank  { font-size:11px; font-weight:700; }
+    .piece .name  { font-size:7.5px; opacity:0.85; }
+    /* Bottom setup bar */
+    #setup-bar {
+      position:absolute; bottom:0; left:0; right:0;
+      background:rgba(16,16,24,0.97); border-top:1px solid rgba(255,255,255,0.1);
+      padding:8px; z-index:20;
+    }
+    #piece-tray {
+      display:flex; gap:4px; flex-wrap:wrap; justify-content:center; margin-bottom:6px;
+    }
+    .tray-piece {
+      width:38px; height:38px; border-radius:4px;
+      background:#1a3a6a; border:2px solid #4a7aff; color:#a0c4ff;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      cursor:pointer; font-size:8px; font-weight:700; font-family:'Outfit',sans-serif;
+      user-select:none; -webkit-tap-highlight-color:transparent; position:relative;
+    }
+    .tray-piece.selected { border-color:#7c6af7; background:#2a1a4a; }
+    .tray-piece.used { opacity:0.3; pointer-events:none; }
+    .tray-piece .count {
+      position:absolute; top:-4px; right:-4px;
+      background:#7c6af7; color:#fff; border-radius:50%;
+      width:14px; height:14px; font-size:8px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    #setup-btns { display:flex; gap:8px; justify-content:center; }
+    .setup-btn {
+      padding:8px 16px; border-radius:8px; border:none;
+      font-weight:700; font-size:13px; cursor:pointer; font-family:'Outfit',sans-serif;
+      min-height:36px; -webkit-tap-highlight-color:transparent;
+    }
+    #auto-setup-btn { background:#2a4a8a; color:#a0c4ff; }
+    #start-game-btn { background:#2a5a3a; color:#80ff90; }
+    #start-game-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    /* Overlays */
+    .overlay {
+      position:absolute; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.85); text-align:center;
+      padding:1.5rem; gap:0.8rem; z-index:40;
+    }
+    .overlay h2 { font-family:'Outfit',sans-serif; font-size:2rem; color:#f0f0f5; margin:0; }
+    .overlay p  { color:#888899; font-size:0.95rem; margin:0; }
+    .big-num    { font-family:'Outfit',sans-serif; font-size:2.5rem; font-weight:700; }
+    .btn-filled {
+      background:#7c6af7; border:none; color:#fff; border-radius:10px;
+      padding:12px 28px; font-size:1rem; font-weight:700; cursor:pointer;
+      font-family:'Outfit',sans-serif; min-height:44px;
+    }
+    .btn-filled.red { background:#a03030; }
+    .hidden { display:none !important; }
+    /* Log */
+    #battle-log {
+      font-size:11px; color:#888899; padding:2px 12px;
+      background:rgba(10,10,18,0.7); border-top:1px solid rgba(255,255,255,0.05);
+      min-height:20px; text-align:center; flex-shrink:0;
+    }
+  </style>
+</head>
+<body>
+
+<header class="game-header">
+  <a href="/airplane-games/" class="btn btn-back game-header__back" aria-label="Back to hub">&#8592;</a>
+  <span class="game-header__title">Stratego Lite</span>
+  <div class="game-header__actions">
+    <div class="score-display">
+      <span class="score-display__label">Wins</span>
+      <span class="score-display__value" id="wins-disp">0</span>
+    </div>
+  </div>
+</header>
+
+<div id="game-area" style="position:relative;">
+  <div id="status-bar">
+    <span class="turn-ind" id="turn-label">Setup</span>
+    <span class="msg" id="status-msg">Place your pieces</span>
+  </div>
+  <div id="board-container">
+    <div id="board"></div>
+  </div>
+  <div id="battle-log" id="battle-log"></div>
+
+  <!-- Setup bar -->
+  <div id="setup-bar">
+    <div id="piece-tray"></div>
+    <div id="setup-btns">
+      <button class="setup-btn" id="auto-setup-btn">Auto Setup</button>
+      <button class="setup-btn" id="start-game-btn" disabled>Start Battle</button>
+    </div>
+  </div>
+
+  <!-- Overlays -->
+  <div class="overlay hidden" id="result-overlay">
+    <h2 id="result-title">You Win!</h2>
+    <p id="result-msg"></p>
+    <div class="big-num" id="result-wins" style="color:#7c6af7"></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn-filled" id="play-again-btn">Play Again</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="intro-overlay">
+    <h2>STRATEGO LITE</h2>
+    <p>Capture the enemy <strong style="color:#e74c3c">Flag</strong> to win</p>
+    <p style="font-size:0.8rem;color:#555">Place your pieces in the bottom 4 rows</p>
+    <button class="btn-filled" id="intro-btn">Setup Pieces</button>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ── Piece definitions ── */
+const PIECE_DEFS = [
+  {name:'Flag',  rank:0,  count:1, immovable:true,  symbol:'🚩'},
+  {name:'Bomb',  rank:11, count:3, immovable:true,  symbol:'💣'},
+  {name:'Marshal', rank:10, count:1, symbol:'M'},
+  {name:'General', rank:9,  count:1, symbol:'G'},
+  {name:'Colonel', rank:8,  count:2, symbol:'Co'},
+  {name:'Major',   rank:7,  count:2, symbol:'Mj'},
+  {name:'Captain', rank:6,  count:3, symbol:'Ca'},
+  {name:'Lieut',   rank:5,  count:3, symbol:'Lt'},
+  {name:'Miner',   rank:3,  count:3, symbol:'Mi'},
+  {name:'Spy',     rank:1,  count:1, symbol:'Sp'},
+  {name:'Scout',   rank:2,  count:2, symbol:'Sc'},
+];
+const ROWS=8, COLS=8;
+
+/* ── DOM ── */
+const boardEl     = document.getElementById('board');
+const statusMsg   = document.getElementById('status-msg');
+const turnLabel   = document.getElementById('turn-label');
+const setupBar    = document.getElementById('setup-bar');
+const pieceTray   = document.getElementById('piece-tray');
+const startBtn    = document.getElementById('start-game-btn');
+const autoBtn     = document.getElementById('auto-setup-btn');
+const battleLog   = document.getElementById('battle-log');
+const resultOv    = document.getElementById('result-overlay');
+const resultTitle = document.getElementById('result-title');
+const resultMsg   = document.getElementById('result-msg');
+const resultWins  = document.getElementById('result-wins');
+const winsDisp    = document.getElementById('wins-disp');
+
+/* ── State ── */
+let board=[], selectedCell=null, gamePhase='setup'; // setup | playing | gameover
+let selectedTrayPiece=null;
+let playerPiecesPlaced=0;
+let wins = (Scores.get('stratego')?.score || 0);
+winsDisp.textContent = wins;
+
+// Board: 8x8 array of {piece: {name,rank,owner,revealed,immovable,symbol} | null}
+function initBoard(){
+  board=[];
+  for(let r=0;r<ROWS;r++){
+    board.push([]);
+    for(let c=0;c<COLS;c++) board[r].push({piece:null});
+  }
+}
+
+/* ── Place AI pieces in top 4 rows ── */
+function placeAIPieces(){
+  const rng = createRNG(Math.floor(Date.now()/86400000)); // daily variation
+  // AI strategy: Flag in back corner, Bombs around it, stronger pieces forward
+  const top4 = [];
+  for(let r=0;r<4;r++) for(let c=0;c<COLS;c++) top4.push([r,c]);
+  const shuffled = rng.shuffle(top4);
+
+  // Place Flag in back row (row 0), protected corners
+  const flagPos = [[0,0],[0,7],[0,3],[0,4]];
+  const flagCell = rng.pick(flagPos);
+  board[flagCell[0]][flagCell[1]].piece = {name:'Flag', rank:0, owner:'ai', revealed:false, immovable:true, symbol:'🚩'};
+
+  // Place 3 Bombs around flag
+  const bombPositions = shuffled.filter(([r,c])=>
+    !(r===flagCell[0]&&c===flagCell[1]) &&
+    (Math.abs(r-flagCell[0])<=1 && Math.abs(c-flagCell[1])<=1)
+  ).slice(0,3);
+
+  let placedBombs=0;
+  for(const [r,c] of bombPositions){
+    if(placedBombs<3 && !board[r][c].piece){
+      board[r][c].piece = {name:'Bomb', rank:11, owner:'ai', revealed:false, immovable:true, symbol:'💣'};
+      placedBombs++;
+    }
+  }
+
+  // Place remaining pieces
+  const remaining = [];
+  for(const def of PIECE_DEFS){
+    if(def.name==='Flag'||def.name==='Bomb') continue;
+    for(let i=0;i<def.count;i++) remaining.push({...def, owner:'ai', revealed:false});
+  }
+  // Add remaining bombs if needed
+  for(let i=placedBombs;i<3;i++) remaining.push({name:'Bomb', rank:11, owner:'ai', revealed:false, immovable:true, symbol:'💣'});
+
+  const rShuffled = rng.shuffle(remaining);
+  let pi=0;
+  for(let r=0;r<4&&pi<rShuffled.length;r++){
+    for(let c=0;c<COLS&&pi<rShuffled.length;c++){
+      if(!board[r][c].piece){
+        board[r][c].piece = rShuffled[pi++];
+      }
+    }
+  }
+}
+
+/* ── Build tray ── */
+let trayState = {}; // name -> remaining count
+function buildTray(){
+  trayState = {};
+  for(const def of PIECE_DEFS) trayState[def.name] = def.count;
+  renderTray();
+}
+function renderTray(){
+  pieceTray.innerHTML='';
+  for(const def of PIECE_DEFS){
+    const rem = trayState[def.name];
+    const div = document.createElement('div');
+    div.className = 'tray-piece' + (rem===0?' used':'') + (selectedTrayPiece?.name===def.name?' selected':'');
+    div.innerHTML = `<span style="font-size:12px">${def.symbol}</span><span style="font-size:8px">${def.name}</span>${rem>1?`<span class="count">${rem}</span>`:''}`;
+    div.title = `${def.name} (rank ${def.rank})${def.immovable?' – Immovable':''}`;
+    if(rem>0) div.addEventListener('click',()=>selectTrayPiece(def));
+    pieceTray.appendChild(div);
+  }
+  // Check if all placed
+  const totalRemaining = Object.values(trayState).reduce((a,b)=>a+b,0);
+  startBtn.disabled = totalRemaining > 0;
+  if(totalRemaining===0) statusMsg.textContent='All pieces placed! Press Start Battle.';
+}
+
+function selectTrayPiece(def){
+  selectedTrayPiece = def;
+  selectedCell = null;
+  renderTray();
+  statusMsg.textContent = `Placing: ${def.name} (${trayState[def.name]} left)`;
+  renderBoard();
+}
+
+/* ── Board rendering ── */
+function renderBoard(){
+  boardEl.innerHTML='';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell = document.createElement('div');
+      cell.className='cell';
+      cell.dataset.r=r; cell.dataset.c=c;
+
+      // Row shading
+      if(r<4) cell.style.background = 'rgba(60,10,10,0.3)'; // AI zone
+      else    cell.style.background = 'rgba(10,20,50,0.3)'; // Player zone
+
+      const bd = board[r][c];
+      if(bd.piece){
+        const p = bd.piece;
+        const pieceEl = document.createElement('div');
+        pieceEl.className = 'piece ' + p.owner;
+        if(p.owner==='ai' && !p.revealed) pieceEl.classList.add('hidden-piece');
+        else {
+          pieceEl.innerHTML = `<span class="rank">${p.symbol}</span><span class="name">${p.name}</span>`;
+        }
+        cell.appendChild(pieceEl);
+      }
+
+      // Highlight selected
+      if(selectedCell && selectedCell.r===r && selectedCell.c===c) cell.classList.add('selected');
+      // Highlight valid moves
+      if(gamePhase==='playing' && selectedCell && validMoves.some(m=>m[0]===r&&m[1]===c)) cell.classList.add('valid-move');
+
+      cell.addEventListener('click',()=>onCellClick(r,c));
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+/* ── Setup click ── */
+function onSetupClick(r,c){
+  if(r<4 || r>=ROWS) return; // only bottom 4 rows for player
+  if(selectedTrayPiece){
+    if(board[r][c].piece){
+      // Swap: return current piece to tray
+      trayState[board[r][c].piece.name]++;
+      playerPiecesPlaced--;
+    }
+    board[r][c].piece = {
+      name: selectedTrayPiece.name,
+      rank: selectedTrayPiece.rank,
+      owner: 'player',
+      revealed: false,
+      immovable: !!selectedTrayPiece.immovable,
+      symbol: selectedTrayPiece.symbol
+    };
+    trayState[selectedTrayPiece.name]--;
+    playerPiecesPlaced++;
+    if(trayState[selectedTrayPiece.name]===0) selectedTrayPiece=null;
+    renderTray(); renderBoard();
+  } else {
+    // Pick up existing piece
+    if(board[r][c].piece && board[r][c].piece.owner==='player'){
+      trayState[board[r][c].piece.name]++;
+      board[r][c].piece=null;
+      playerPiecesPlaced--;
+      renderTray(); renderBoard();
+    }
+  }
+}
+
+/* ── Auto-setup ── */
+function autoSetup(){
+  // Clear player pieces
+  for(let r=4;r<ROWS;r++) for(let c=0;c<COLS;c++) board[r][c].piece=null;
+  for(const k of Object.keys(trayState)) trayState[k]=0;
+
+  // Reset tray
+  for(const def of PIECE_DEFS) trayState[def.name] = def.count;
+  playerPiecesPlaced=0;
+
+  const rng = createRNG(Date.now());
+  const positions=[];
+  for(let r=4;r<ROWS;r++) for(let c=0;c<COLS;c++) positions.push([r,c]);
+  const shuffled = rng.shuffle(positions);
+
+  // Strategy: Flag in back row, Bombs around it
+  const backRow = shuffled.filter(([r])=>r===7);
+  const flagPos = rng.pick(backRow);
+  board[flagPos[0]][flagPos[1]].piece = {name:'Flag',rank:0,owner:'player',revealed:false,immovable:true,symbol:'🚩'};
+  trayState['Flag']=0;
+
+  // Bombs around flag
+  let bombsPlaced=0;
+  for(const [r,c] of shuffled){
+    if(bombsPlaced>=3) break;
+    if(r===flagPos[0]&&c===flagPos[1]) continue;
+    if(Math.abs(r-flagPos[0])<=1 && Math.abs(c-flagPos[1])<=1){
+      board[r][c].piece = {name:'Bomb',rank:11,owner:'player',revealed:false,immovable:true,symbol:'💣'};
+      bombsPlaced++;
+    }
+  }
+  trayState['Bomb'] = 3-bombsPlaced;
+
+  // Rest randomly
+  const remaining=[];
+  for(const def of PIECE_DEFS){
+    if(def.name==='Flag') continue;
+    const leftover = trayState[def.name];
+    for(let i=0;i<leftover;i++) remaining.push({...def,owner:'player',revealed:false});
+  }
+  const rRemaining = rng.shuffle(remaining);
+  let pi=0;
+  for(const [r,c] of shuffled){
+    if(pi>=rRemaining.length) break;
+    if(!board[r][c].piece) board[r][c].piece = rRemaining[pi++];
+  }
+
+  // Zero out tray
+  for(const def of PIECE_DEFS) trayState[def.name]=0;
+  renderTray(); renderBoard();
+}
+
+/* ── Game play ── */
+let validMoves=[];
+let playerTurn=true;
+let aiThinkTimer=null;
+
+function startGame(){
+  gamePhase='playing';
+  selectedTrayPiece=null;
+  selectedCell=null;
+  validMoves=[];
+  setupBar.classList.add('hidden');
+  playerTurn=true;
+  turnLabel.textContent='Your Turn';
+  statusMsg.textContent='Click a piece to move';
+  renderBoard();
+}
+
+function onCellClick(r,c){
+  if(gamePhase==='setup'){ onSetupClick(r,c); return; }
+  if(gamePhase!=='playing' || !playerTurn) return;
+
+  const bd = board[r][c];
+
+  if(selectedCell){
+    // Try to move to this cell
+    if(validMoves.some(m=>m[0]===r&&m[1]===c)){
+      executeMove(selectedCell.r, selectedCell.c, r, c, 'player');
+      selectedCell=null; validMoves=[];
+      renderBoard();
+      if(gamePhase==='playing'){
+        playerTurn=false;
+        turnLabel.textContent='AI Turn';
+        statusMsg.textContent='AI is thinking...';
+        aiThinkTimer = setTimeout(doAITurn, 700);
+      }
+      return;
+    }
+    // Deselect if clicking empty area
+    if(!bd.piece || bd.piece.owner!=='player'){
+      selectedCell=null; validMoves=[];
+      renderBoard(); return;
+    }
+  }
+
+  // Select player piece
+  if(bd.piece && bd.piece.owner==='player' && !bd.piece.immovable){
+    selectedCell={r,c};
+    validMoves = getValidMoves(r,c,'player');
+    statusMsg.textContent = `${bd.piece.name} selected – ${validMoves.length} move(s)`;
+    renderBoard();
+  }
+}
+
+function getValidMoves(r, c, owner){
+  const piece = board[r][c].piece;
+  if(!piece || piece.immovable) return [];
+  const moves=[];
+  const dirs=[[0,1],[0,-1],[1,0],[-1,0]];
+  const opponent = owner==='player'?'ai':'player';
+
+  if(piece.rank===2){ // Scout: any distance in straight line
+    for(const [dr,dc] of dirs){
+      let nr=r+dr, nc=c+dc;
+      while(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS){
+        const target=board[nr][nc].piece;
+        if(target){
+          if(target.owner===opponent) moves.push([nr,nc]); // can attack
+          break; // blocked
+        }
+        moves.push([nr,nc]);
+        nr+=dr; nc+=dc;
+      }
+    }
+  } else {
+    for(const [dr,dc] of dirs){
+      const nr=r+dr, nc=c+dc;
+      if(nr<0||nr>=ROWS||nc<0||nc>=COLS) continue;
+      const target=board[nr][nc].piece;
+      if(!target || target.owner===opponent) moves.push([nr,nc]);
+    }
+  }
+  return moves;
+}
+
+function executeMove(fr, fc, tr, tc, mover){
+  const attacker = board[fr][fc].piece;
+  const defender = board[tr][tc].piece;
+
+  if(!defender){
+    // Simple move
+    board[tr][tc].piece = attacker;
+    board[fr][fc].piece = null;
+    setLog(`${mover==='player'?'You':'AI'} moved ${attacker.name}`);
+  } else {
+    // Combat
+    attacker.revealed = true;
+    defender.revealed = true;
+    const result = resolveCombat(attacker, defender, mover);
+    setLog(result.msg);
+
+    if(result.winner==='attacker'){
+      board[tr][tc].piece = attacker;
+      board[fr][fc].piece = null;
+    } else if(result.winner==='defender'){
+      board[fr][fc].piece = null;
+    } else { // tie
+      board[fr][fc].piece = null;
+      board[tr][tc].piece = null;
+    }
+
+    // Check win condition
+    if(attacker.name==='Flag'){ // shouldn't happen since flag immovable
+    } else if(defender.name==='Flag'){
+      const winner = mover;
+      setTimeout(()=>showResult(winner), 300);
+      gamePhase='gameover';
+      return;
+    }
+    // Check if one side has no movable pieces
+    if(!hasMoveablePieces('player')){
+      setTimeout(()=>showResult('ai'), 300);
+      gamePhase='gameover';
+      return;
+    }
+    if(!hasMoveablePieces('ai')){
+      setTimeout(()=>showResult('player'), 300);
+      gamePhase='gameover';
+      return;
+    }
+  }
+}
+
+function resolveCombat(attacker, defender, attackerOwner){
+  const ar=attacker.rank, dr=defender.rank;
+  let winner, msg;
+
+  // Special: Spy beats Marshal when Spy attacks
+  if(ar===1 && dr===10){
+    winner='attacker'; msg=`Spy ambushes Marshal!`;
+  }
+  // Special: Miner defuses Bomb
+  else if(ar===3 && dr===11){
+    winner='attacker'; msg=`Miner defuses Bomb!`;
+  }
+  // Attacker vs Bomb
+  else if(dr===11){
+    winner='defender'; msg=`${attacker.name} hits a Bomb!`;
+  }
+  // Tie
+  else if(ar===dr){
+    winner='tie'; msg=`${attacker.name} vs ${defender.name} – both removed!`;
+  }
+  // Normal
+  else if(ar>dr){
+    winner='attacker'; msg=`${attacker.name}(${ar}) beats ${defender.name}(${dr})`;
+  } else {
+    winner='defender'; msg=`${defender.name}(${dr}) beats ${attacker.name}(${ar})`;
+  }
+
+  // Reveal on board
+  if(attackerOwner==='player'){
+    msg = `You: ${msg}`;
+  } else {
+    msg = `AI: ${msg}`;
+  }
+  return {winner, msg};
+}
+
+function hasMoveablePieces(owner){
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const p=board[r][c].piece;
+      if(p && p.owner===owner && !p.immovable){
+        if(getValidMoves(r,c,owner).length>0) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/* ── AI turn ── */
+function doAITurn(){
+  if(gamePhase!=='playing') return;
+
+  // Collect all AI movable pieces and their moves
+  const candidates=[];
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const p=board[r][c].piece;
+      if(p && p.owner==='ai' && !p.immovable){
+        const moves = getValidMoves(r,c,'ai');
+        for(const [tr,tc] of moves){
+          const target = board[tr][tc].piece;
+          let priority=0;
+          if(target && target.owner==='player'){
+            if(target.name==='Flag') priority=1000;
+            else if(target.revealed){
+              // Attack if we likely win
+              const ar=p.rank, dr=target.rank;
+              if(p.name==='Miner' && target.name==='Bomb') priority=500;
+              else if(p.name==='Spy' && target.name==='Marshal') priority=400;
+              else if(ar>dr) priority=200 + ar;
+              else if(ar===dr) priority=50;
+              else priority=-100; // avoid losing
+            } else {
+              priority=30; // unknown: moderate interest
+            }
+          } else {
+            // Move toward player territory
+            priority = tr; // higher r = closer to player (rows 4-7)
+          }
+          candidates.push({fr:r,fc:c,tr,tc,priority});
+        }
+      }
+    }
+  }
+
+  if(candidates.length===0){ // AI has no moves
+    showResult('player');
+    gamePhase='gameover';
+    return;
+  }
+
+  // Filter out very negative priorities
+  const good = candidates.filter(c=>c.priority>=0);
+  const pool = good.length>0 ? good : candidates;
+  // Sort by priority descending, pick from top few with some randomness
+  pool.sort((a,b)=>b.priority-a.priority);
+  const topN = Math.min(5, pool.length);
+  const rng = createRNG(Date.now());
+  const chosen = pool[rng.int(0, topN-1)];
+
+  executeMove(chosen.fr, chosen.fc, chosen.tr, chosen.tc, 'ai');
+  renderBoard();
+
+  if(gamePhase==='playing'){
+    playerTurn=true;
+    turnLabel.textContent='Your Turn';
+    statusMsg.textContent='Select a piece to move';
+  }
+}
+
+function showResult(winner){
+  const playerWon = winner==='player';
+  if(playerWon){
+    wins++;
+    Scores.set('stratego', wins);
+    winsDisp.textContent=wins;
+  }
+  resultTitle.textContent = playerWon ? '🏆 Victory!' : '💀 Defeated!';
+  resultTitle.style.color = playerWon ? '#2ecc71' : '#e74c3c';
+  resultMsg.textContent   = playerWon ? 'You captured the enemy Flag!' : 'Your Flag was captured!';
+  resultWins.textContent  = `Total Wins: ${wins}`;
+  resultOv.classList.remove('hidden');
+}
+
+function setLog(msg){
+  battleLog.textContent = msg;
+}
+
+/* ── Buttons ── */
+autoBtn.addEventListener('click', autoSetup);
+startBtn.addEventListener('click',()=>{ startGame(); });
+document.getElementById('play-again-btn').addEventListener('click',()=>{
+  resultOv.classList.add('hidden');
+  setupBar.classList.remove('hidden');
+  initBoard(); placeAIPieces(); buildTray();
+  gamePhase='setup'; playerTurn=true; selectedCell=null; validMoves=[];
+  turnLabel.textContent='Setup'; statusMsg.textContent='Place your pieces';
+  battleLog.textContent='';
+  renderBoard();
+});
+document.getElementById('intro-btn').addEventListener('click',()=>{
+  document.getElementById('intro-overlay').classList.add('hidden');
+  initBoard(); placeAIPieces(); buildTray(); renderBoard();
+});
+
+})();
+</script>
+</body>
+</html>

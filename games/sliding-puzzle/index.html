@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <base href="/airplane-games/">
+  <title>Sliding Puzzle — Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body { display:flex; flex-direction:column; height:100dvh; overflow:hidden; background:var(--bg-deep); }
+    .game-header { display:flex; align-items:center; gap:8px; padding:10px 16px; background:var(--bg-panel); border-bottom:1px solid var(--border-subtle); flex-shrink:0; }
+    .game-header h1 { font-family:'Outfit',sans-serif; font-size:1.2rem; color:var(--text-primary); flex:1; margin:0; }
+    .btn { padding:8px 12px; background:var(--bg-card); border:1px solid var(--accent-warm); color:var(--accent-warm); border-radius:8px; cursor:pointer; font-size:0.85rem; min-height:44px; font-family:'Inter',sans-serif; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; }
+    .btn:hover { background:rgba(247,169,74,0.15); }
+    .game-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:12px; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+    .size-btn { min-height:36px; padding:6px 14px; font-size:0.8rem; }
+    .size-btn.active { background:var(--accent-primary); border-color:var(--accent-primary); color:#fff; }
+    .stats { display:flex; gap:20px; font-size:0.9rem; color:var(--text-dim); }
+    .stats span b { color:var(--accent-warm); }
+    #puzzle { display:grid; gap:4px; background:#333; border-radius:8px; padding:4px; border:2px solid var(--border-subtle); touch-action:none; }
+    .tile { display:flex; align-items:center; justify-content:center; border-radius:6px; font-family:'Outfit',sans-serif; font-weight:700; cursor:pointer; transition:transform 0.12s, background 0.2s; user-select:none; background:var(--accent-primary); color:#fff; }
+    .tile:hover { background:var(--accent-warm); }
+    .tile.blank { background:var(--bg-deep); cursor:default; }
+    .tile.solved { background:var(--accent-green) !important; animation:none; }
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100; align-items:center; justify-content:center; }
+    .modal.show { display:flex; }
+    .modal-box { background:var(--bg-panel); border:1px solid var(--border-subtle); border-radius:16px; padding:28px; text-align:center; max-width:300px; width:90%; }
+    .modal-box h2 { font-family:'Outfit',sans-serif; font-size:1.6rem; margin:0 0 10px; }
+    .modal-box p { color:var(--text-dim); margin:0 0 16px; }
+    .seed-info { font-size:0.8rem; color:var(--text-dim); }
+    @keyframes popIn { 0%{transform:scale(0.8)} 100%{transform:scale(1)} }
+  </style>
+</head>
+<body>
+  <div class="game-header">
+    <a href="/airplane-games/" class="btn btn-back">← Hub</a>
+    <h1>Sliding Puzzle</h1>
+  </div>
+  <div class="game-body">
+    <div class="controls">
+      <button class="btn size-btn active" data-size="3">3×3</button>
+      <button class="btn size-btn" data-size="4">4×4</button>
+      <button class="btn size-btn" data-size="5">5×5</button>
+      <button class="btn" id="shuffleBtn">Shuffle</button>
+      <button class="btn" id="dailyBtn">Daily</button>
+    </div>
+    <div class="stats">
+      <span>Moves: <b id="moves">0</b></span>
+      <span>Time: <b id="timer">0:00</b></span>
+      <span>Best: <b id="best">—</b></span>
+    </div>
+    <div id="puzzle"></div>
+    <div class="seed-info" id="seed-info"></div>
+  </div>
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <h2>Solved! 🎉</h2>
+      <p id="modal-msg"></p>
+      <button class="btn" onclick="shuffleNew()" style="width:100%;margin-bottom:8px;">New Puzzle</button>
+      <a href="/airplane-games/" class="btn" style="display:block;text-align:center;">← Hub</a>
+    </div>
+  </div>
+  <script src="js/shared.js"></script>
+  <script>
+    let size=3, tiles=[], blank=0, moves=0, timerVal=0, timerInterval=null, solved=false;
+
+    function getInversions(arr) {
+      let inv=0;
+      for (let i=0;i<arr.length-1;i++) for (let j=i+1;j<arr.length;j++) if (arr[i]&&arr[j]&&arr[i]>arr[j]) inv++;
+      return inv;
+    }
+
+    function isSolvable(arr, n) {
+      const inv = getInversions(arr);
+      if (n%2===1) return inv%2===0;
+      const blankRow = Math.floor(arr.indexOf(0)/n);
+      const rowFromBottom = n - blankRow;
+      return (inv + rowFromBottom) % 2 === 0;
+    }
+
+    function generatePuzzle(n, seed) {
+      const rng = createRNG(seed);
+      const total = n*n;
+      let arr;
+      do {
+        arr = [...Array(total).keys()];
+        for (let i=total-1;i>0;i--) { const j=rng.int(0,i); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+      } while (!isSolvable(arr,n));
+      return arr;
+    }
+
+    function isSolved() {
+      for (let i=0;i<tiles.length-1;i++) if (tiles[i]!==i+1) return false;
+      return tiles[tiles.length-1]===0;
+    }
+
+    let currentSeed = 0;
+    function newPuzzle(seed) {
+      currentSeed = seed;
+      tiles = generatePuzzle(size, seed);
+      blank = tiles.indexOf(0);
+      moves = 0; solved = false;
+      document.getElementById('moves').textContent = 0;
+      document.getElementById('seed-info').textContent = 'Seed: ' + seed;
+      clearInterval(timerInterval); timerVal = 0;
+      timerInterval = setInterval(() => {
+        timerVal++;
+        const m = Math.floor(timerVal/60), s = timerVal%60;
+        document.getElementById('timer').textContent = m+':'+(s<10?'0':'')+s;
+      }, 1000);
+      document.getElementById('modal').classList.remove('show');
+      renderPuzzle();
+      updateBest();
+    }
+
+    function shuffleNew() { newPuzzle(Math.floor(Math.random()*999999)); }
+
+    function updateBest() {
+      const key = 'ag_slide_best_'+size;
+      const b = localStorage.getItem(key);
+      document.getElementById('best').textContent = b ? b+'m' : '—';
+    }
+
+    function renderPuzzle() {
+      const el = document.getElementById('puzzle');
+      const tileSize = Math.min(Math.floor((Math.min(window.innerWidth,window.innerHeight)*0.65)/size), 90);
+      el.style.gridTemplateColumns = `repeat(${size},${tileSize}px)`;
+      el.innerHTML = '';
+      tiles.forEach((val,idx) => {
+        const div = document.createElement('div');
+        div.className = 'tile' + (val===0?' blank':'') + (solved?' solved':'');
+        div.style.width = tileSize+'px';
+        div.style.height = tileSize+'px';
+        div.style.fontSize = tileSize>70?'1.8rem':tileSize>50?'1.4rem':'1.1rem';
+        if (val) div.textContent = val;
+        div.addEventListener('click', () => tryMove(idx));
+        el.appendChild(div);
+      });
+    }
+
+    function tryMove(idx) {
+      if (solved) return;
+      const row = Math.floor(idx/size), col = idx%size;
+      const brow = Math.floor(blank/size), bcol = blank%size;
+      if ((Math.abs(row-brow)===1 && col===bcol) || (Math.abs(col-bcol)===1 && row===brow)) {
+        [tiles[idx],tiles[blank]] = [tiles[blank],tiles[idx]];
+        blank = idx; moves++;
+        document.getElementById('moves').textContent = moves;
+        renderPuzzle();
+        if (isSolved()) onSolved();
+      }
+    }
+
+    function onSolved() {
+      solved = true; clearInterval(timerInterval);
+      const m = Math.floor(timerVal/60), s = timerVal%60;
+      const timeStr = m+':'+(s<10?'0':'')+s;
+      const key = 'ag_slide_best_'+size;
+      const prev = parseInt(localStorage.getItem(key)||'9999');
+      if (moves < prev) localStorage.setItem(key, moves);
+      Scores.set('sliding-puzzle', moves > 0 ? Math.floor(1000/moves * size) : 1000);
+      renderPuzzle();
+      document.getElementById('modal-msg').textContent = `${moves} moves in ${timeStr}`;
+      document.getElementById('modal').classList.add('show');
+      updateBest();
+    }
+
+    // Touch swipe
+    let tx=0,ty=0;
+    document.getElementById('puzzle').addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+    document.getElementById('puzzle').addEventListener('touchend',e=>{
+      if(solved) return;
+      const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+      const brow=Math.floor(blank/size), bcol=blank%size;
+      if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>20) {
+        const ti=dx>0?blank-1:blank+1;
+        if(ti>=0&&ti<size*size&&Math.floor(ti/size)===brow) tryMove(ti);
+      } else if(Math.abs(dy)>20) {
+        const ti=dy>0?blank-size:blank+size;
+        if(ti>=0&&ti<size*size) tryMove(ti);
+      }
+    },{passive:true});
+
+    // Arrow keys
+    document.addEventListener('keydown',e=>{
+      const map={ArrowLeft:blank-1,ArrowRight:blank+1,ArrowUp:blank-size,ArrowDown:blank+size};
+      if(map[e.key]!==undefined){e.preventDefault();tryMove(map[e.key]);}
+    });
+
+    // Size buttons
+    document.querySelectorAll('.size-btn').forEach(b=>{
+      b.addEventListener('click',()=>{
+        document.querySelectorAll('.size-btn').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        size=parseInt(b.dataset.size);
+        shuffleNew();
+      });
+    });
+
+    document.getElementById('shuffleBtn').addEventListener('click', shuffleNew);
+    document.getElementById('dailyBtn').addEventListener('click', () => newPuzzle(getDailySeed('sliding-'+size)));
+
+    shuffleNew();
+  </script>
+</body>
+</html>

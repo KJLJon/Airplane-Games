@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <base href="/airplane-games/">
+  <title>Dogfight – Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    body { display:flex; flex-direction:column; height:100dvh; overflow:hidden; background:#0a0a12; }
+    .game-header { flex-shrink:0; }
+    #canvas-container {
+      flex:1; position:relative; overflow:hidden; touch-action:none;
+    }
+    #gameCanvas { position:absolute; top:0; left:0; width:100%; height:100%; }
+    /* HUD lives */
+    #hud {
+      position:absolute; top:8px; left:50%; transform:translateX(-50%);
+      display:flex; gap:6px; pointer-events:none; z-index:10;
+    }
+    .heart { font-size:1.4rem; }
+    /* Overlay screens */
+    .overlay {
+      position:absolute; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; z-index:20;
+      background:rgba(0,0,0,0.75); text-align:center; padding:1rem;
+      gap:1rem;
+    }
+    .overlay h2 { font-family:'Outfit',sans-serif; font-size:2rem; color:#f0f0f5; }
+    .overlay p  { color:#888899; font-size:1.1rem; }
+    .overlay .big-score { font-family:'Outfit',sans-serif; font-size:3rem; font-weight:700; color:#e74c3c; }
+    /* Touch controls */
+    #touch-left, #touch-right {
+      position:absolute; top:0; width:30%; height:100%;
+      touch-action:none; z-index:5;
+    }
+    #touch-left  { left:0; }
+    #touch-right { right:0; }
+    #fire-btn {
+      position:absolute; bottom:24px; right:24px;
+      width:70px; height:70px; border-radius:50%;
+      background:rgba(231,76,60,0.4); border:2px solid #e74c3c;
+      color:#e74c3c; font-size:1.4rem; font-family:'Outfit',sans-serif;
+      font-weight:700; cursor:pointer; touch-action:manipulation;
+      z-index:10; display:flex; align-items:center; justify-content:center;
+      user-select:none; -webkit-tap-highlight-color:transparent;
+    }
+    #thrust-btn {
+      position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
+      width:70px; height:70px; border-radius:50%;
+      background:rgba(124,106,247,0.3); border:2px solid #7c6af7;
+      color:#7c6af7; font-size:0.85rem; font-family:'Outfit',sans-serif;
+      font-weight:700; cursor:pointer; touch-action:manipulation;
+      z-index:10; display:flex; align-items:center; justify-content:center;
+      user-select:none; -webkit-tap-highlight-color:transparent;
+    }
+    #level-info {
+      position:absolute; top:8px; right:12px;
+      font-family:'Outfit',sans-serif; font-size:0.85rem;
+      color:#888899; pointer-events:none; z-index:10;
+    }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body class="accent-dogfight">
+
+<header class="game-header">
+  <a href="/airplane-games/" class="btn btn-back game-header__back" aria-label="Back to hub">&#8592;</a>
+  <span class="game-header__title">Dogfight</span>
+  <div class="game-header__score">
+    <span class="game-header__score-label">Score</span>
+    <span class="game-header__score-value" id="score-display">0</span>
+  </div>
+</header>
+
+<div id="canvas-container">
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud"></div>
+  <div id="level-info">Lv 1</div>
+  <div id="touch-left"></div>
+  <div id="touch-right"></div>
+  <button id="thrust-btn">THRUST</button>
+  <button id="fire-btn">FIRE</button>
+
+  <!-- Start overlay -->
+  <div class="overlay" id="start-overlay">
+    <h2>DOGFIGHT</h2>
+    <p>Destroy enemy planes across 100 levels</p>
+    <p style="font-size:0.85rem; color:#555">Arrows/WASD = turn &amp; thrust &nbsp;|&nbsp; Space = fire</p>
+    <button class="btn btn-primary-filled" id="start-btn" style="min-width:160px">Start Game</button>
+  </div>
+
+  <!-- Level complete overlay -->
+  <div class="overlay hidden" id="level-overlay">
+    <h2 id="level-title">Level 1 Complete!</h2>
+    <p id="level-score-msg"></p>
+    <div class="big-score" id="level-score-display"></div>
+    <button class="btn btn-primary-filled" id="next-level-btn" style="min-width:160px">Next Level</button>
+  </div>
+
+  <!-- Game over overlay -->
+  <div class="overlay hidden" id="gameover-overlay">
+    <h2>GAME OVER</h2>
+    <p>Total planes destroyed:</p>
+    <div class="big-score" id="go-score"></div>
+    <p id="go-highscore" style="color:#f7a94a; font-size:0.9rem"></p>
+    <button class="btn btn-primary-filled" id="restart-btn" style="min-width:160px">Play Again</button>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ── Constants ── */
+const DRAG = 0.985;
+const BULLET_SPEED = 7;
+const BULLET_RANGE = 420;
+const TURN_RATE = 0.065;
+const THRUST_POWER = 0.22;
+const MAX_SPEED = 5.5;
+const PLANE_SIZE = 14;
+const EXPLOSION_DURATION = 35;
+const AI_FIRE_ANGLE = 0.18;
+const LEVEL_BONUS_TIME = 10000; // ms for quick-kill bonus
+
+/* ── DOM ── */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreDisplay = document.getElementById('score-display');
+const levelInfo = document.getElementById('level-info');
+const hudEl = document.getElementById('hud');
+const startOverlay = document.getElementById('start-overlay');
+const levelOverlay = document.getElementById('level-overlay');
+const gameoverOverlay = document.getElementById('gameover-overlay');
+const levelTitle = document.getElementById('level-title');
+const levelScoreMsg = document.getElementById('level-score-msg');
+const levelScoreDisplay = document.getElementById('level-score-display');
+const goScore = document.getElementById('go-score');
+const goHighscore = document.getElementById('go-highscore');
+
+/* ── State ── */
+let W, H;
+let state = 'start'; // start | playing | level_complete | gameover
+let currentLevel = 1;
+let totalScore = 0;
+let totalDestroyed = 0;
+let lives = 3;
+let levelStartTime = 0;
+let levelEnemiesDestroyed = 0;
+
+let player, enemies, bullets, explosions;
+let keys = {};
+
+/* ── Resize ── */
+function resize(){
+  W = canvas.width  = canvas.offsetWidth;
+  H = canvas.height = canvas.offsetHeight;
+  if(!W || !H){ W=canvas.width=360; H=canvas.height=600; }
+}
+window.addEventListener('resize', ()=>{ resize(); });
+resize();
+
+/* ── Level config ── */
+function getLevelConfig(lvl){
+  let count, aiType, shoots;
+  if(lvl<=20){      count=1; aiType='basic';   shoots=false; }
+  else if(lvl<=50){ count=Math.min(2,Math.floor(1+(lvl-20)/15)); aiType='shooter'; shoots=true; }
+  else if(lvl<=80){ count=Math.min(3,Math.floor(2+(lvl-50)/15)); aiType='smart';   shoots=true; }
+  else{             count=Math.min(4,Math.floor(3+(lvl-80)/10)); aiType='escort';  shoots=true; }
+  return { count, aiType, shoots };
+}
+
+/* ── Plane factory ── */
+function makePlane(x,y,angle,isPlayer){
+  return {
+    x, y, vx:0, vy:0, angle: angle||0,
+    av:0, // angular velocity
+    alive: true, isPlayer,
+    fireTimer: isPlayer ? 0 : (Math.random()*80+40),
+    invincible: 0,
+    flashTimer: 0,
+  };
+}
+
+function spawnPlayer(){
+  return makePlane(W/2, H*0.75, -Math.PI/2, true);
+}
+
+function spawnEnemies(cfg){
+  const list=[];
+  const rng = createRNG(getLevelSeed('dogfight', currentLevel));
+  for(let i=0;i<cfg.count;i++){
+    const side = rng.int(0,3);
+    let x,y;
+    if(side===0){ x=rng.int(20,W-20); y=20; }
+    else if(side===1){ x=rng.int(20,W-20); y=H-20; }
+    else if(side===2){ x=20; y=rng.int(20,H-20); }
+    else{ x=W-20; y=rng.int(20,H-20); }
+    const e = makePlane(x,y, Math.PI/2, false);
+    e.aiType = cfg.aiType;
+    e.shoots = cfg.shoots;
+    e.fireTimer = 60 + i*40;
+    e.speed = 1.5 + currentLevel*0.02;
+    if(cfg.aiType==='escort' && i>0){ e.leader = list[0]; }
+    list.push(e);
+  }
+  return list;
+}
+
+function startLevel(){
+  const cfg = getLevelConfig(currentLevel);
+  player = spawnPlayer();
+  player.invincible = 120;
+  enemies = spawnEnemies(cfg);
+  bullets = [];
+  explosions = [];
+  levelStartTime = performance.now();
+  levelEnemiesDestroyed = 0;
+  state='playing';
+  levelInfo.textContent = `Lv ${currentLevel}`;
+  updateHUD();
+}
+
+function updateHUD(){
+  let html='';
+  for(let i=0;i<lives;i++) html+='<span class="heart">❤️</span>';
+  hudEl.innerHTML = html;
+}
+
+/* ── Input ── */
+document.addEventListener('keydown',e=>{ keys[e.code]=true; e.preventDefault && e.defaultPrevented; });
+document.addEventListener('keyup',  e=>{ keys[e.code]=false; });
+
+// Touch zones
+const touchLeft = document.getElementById('touch-left');
+const touchRight= document.getElementById('touch-right');
+let touchTurningLeft=false, touchTurningRight=false, touchThrust=false;
+
+touchLeft.addEventListener('touchstart', e=>{ touchTurningLeft=true; e.preventDefault(); },{passive:false});
+touchLeft.addEventListener('touchend',   e=>{ touchTurningLeft=false; });
+touchRight.addEventListener('touchstart',e=>{ touchTurningRight=true; e.preventDefault(); },{passive:false});
+touchRight.addEventListener('touchend',  e=>{ touchTurningRight=false; });
+
+const thrustBtn = document.getElementById('thrust-btn');
+thrustBtn.addEventListener('touchstart', e=>{ touchThrust=true; e.preventDefault(); },{passive:false});
+thrustBtn.addEventListener('touchend',   e=>{ touchThrust=false; });
+thrustBtn.addEventListener('mousedown',  ()=>{ touchThrust=true; });
+thrustBtn.addEventListener('mouseup',    ()=>{ touchThrust=false; });
+
+const fireBtn = document.getElementById('fire-btn');
+let touchFirePressed = false;
+fireBtn.addEventListener('touchstart', e=>{ touchFirePressed=true; e.preventDefault(); },{passive:false});
+fireBtn.addEventListener('touchend',   e=>{ touchFirePressed=false; });
+fireBtn.addEventListener('mousedown',  ()=>{ touchFirePressed=true; });
+fireBtn.addEventListener('mouseup',    ()=>{ touchFirePressed=false; });
+
+/* ── Bullet factory ── */
+function fireBullet(plane, isPlayer){
+  bullets.push({
+    x: plane.x + Math.cos(plane.angle)*PLANE_SIZE,
+    y: plane.y + Math.sin(plane.angle)*PLANE_SIZE,
+    vx: plane.vx + Math.cos(plane.angle)*BULLET_SPEED,
+    vy: plane.vy + Math.sin(plane.angle)*BULLET_SPEED,
+    dist: 0, isPlayer
+  });
+}
+
+/* ── Explosion factory ── */
+function explode(x,y){
+  explosions.push({ x, y, r:4, maxR:40+Math.random()*20, alpha:1, timer:0 });
+}
+
+/* ── AI update ── */
+function updateAI(ai){
+  if(!ai.alive || !player.alive) return;
+  const dx = player.x - ai.x;
+  const dy = player.y - ai.y;
+  const targetAngle = Math.atan2(dy, dx);
+  let diff = targetAngle - ai.angle;
+  // Normalize
+  while(diff > Math.PI)  diff -= Math.PI*2;
+  while(diff < -Math.PI) diff += Math.PI*2;
+
+  const turnSpeed = ai.aiType==='basic' ? TURN_RATE*0.6 :
+                    ai.aiType==='shooter' ? TURN_RATE*0.75 : TURN_RATE*0.9;
+
+  if(diff > 0.05)       ai.angle += turnSpeed;
+  else if(diff < -0.05) ai.angle -= turnSpeed;
+
+  // Thrust
+  const dist = Math.hypot(dx, dy);
+  const aiSpeed = ai.speed || 2;
+  if(dist > 60 || ai.aiType==='basic'){
+    ai.vx += Math.cos(ai.angle)*THRUST_POWER*0.7*(aiSpeed/2);
+    ai.vy += Math.sin(ai.angle)*THRUST_POWER*0.7*(aiSpeed/2);
+  }
+
+  // Smart: keep distance
+  if((ai.aiType==='smart'||ai.aiType==='escort') && dist < 120){
+    ai.vx -= Math.cos(ai.angle)*THRUST_POWER*0.5;
+    ai.vy -= Math.sin(ai.angle)*THRUST_POWER*0.5;
+  }
+
+  // Escort: leader follow
+  if(ai.aiType==='escort' && ai.leader && ai.leader.alive){
+    const ldx = ai.leader.x - ai.x;
+    const ldy = ai.leader.y - ai.y;
+    const ld = Math.hypot(ldx, ldy);
+    if(ld > 80){
+      ai.vx += ldx/ld * THRUST_POWER*0.3;
+      ai.vy += ldy/ld * THRUST_POWER*0.3;
+    }
+  }
+
+  // Cap speed
+  const spd = Math.hypot(ai.vx, ai.vy);
+  const maxSpd = 2.5 + currentLevel*0.03;
+  if(spd > maxSpd){ ai.vx = ai.vx/spd*maxSpd; ai.vy = ai.vy/spd*maxSpd; }
+
+  // Fire
+  if(ai.shoots){
+    ai.fireTimer--;
+    if(ai.fireTimer <= 0){
+      const angDiff = Math.abs(diff);
+      if(angDiff < AI_FIRE_ANGLE + (ai.aiType==='basic' ? 0.1 : 0)){
+        fireBullet(ai, false);
+      }
+      ai.fireTimer = 40 + Math.floor(Math.random()*60);
+    }
+  }
+}
+
+/* ── Player fire timer ── */
+let playerFireTimer = 0;
+const PLAYER_FIRE_RATE = 15;
+
+/* ── Physics update ── */
+function updatePlane(plane){
+  if(!plane.alive) return;
+  plane.x = (plane.x + plane.vx + W) % W;
+  plane.y = (plane.y + plane.vy + H) % H;
+  plane.vx *= DRAG;
+  plane.vy *= DRAG;
+  if(plane.invincible > 0) plane.invincible--;
+  if(plane.flashTimer > 0) plane.flashTimer--;
+}
+
+/* ── Collision helpers ── */
+function circleHit(ax,ay,bx,by,r){ return Math.hypot(ax-bx,ay-by) < r; }
+
+/* ── Main update ── */
+function update(){
+  if(state !== 'playing') return;
+
+  // Player input
+  const turning = (keys['ArrowLeft']||keys['KeyA']||touchTurningLeft);
+  const turningR= (keys['ArrowRight']||keys['KeyD']||touchTurningRight);
+  const thrusting=(keys['ArrowUp']||keys['KeyW']||touchThrust);
+  const firing   =(keys['Space']||touchFirePressed);
+
+  if(player.alive){
+    if(turning)  player.angle -= TURN_RATE;
+    if(turningR) player.angle += TURN_RATE;
+    if(thrusting){
+      player.vx += Math.cos(player.angle)*THRUST_POWER;
+      player.vy += Math.sin(player.angle)*THRUST_POWER;
+      const spd = Math.hypot(player.vx, player.vy);
+      if(spd > MAX_SPEED){ player.vx = player.vx/spd*MAX_SPEED; player.vy = player.vy/spd*MAX_SPEED; }
+    }
+    // Fire
+    playerFireTimer--;
+    if(firing && playerFireTimer <= 0){
+      fireBullet(player, true);
+      playerFireTimer = PLAYER_FIRE_RATE;
+    }
+    updatePlane(player);
+  }
+
+  // AI update
+  enemies.forEach(e=>{ if(e.alive){ updateAI(e); updatePlane(e); } });
+
+  // Bullets update
+  for(let i=bullets.length-1; i>=0; i--){
+    const b = bullets[i];
+    b.x += b.vx; b.y += b.vy;
+    b.dist += Math.hypot(b.vx, b.vy);
+    // Out of range or off-screen
+    if(b.dist > BULLET_RANGE || b.x<-20||b.x>W+20||b.y<-20||b.y>H+20){
+      bullets.splice(i,1); continue;
+    }
+    // Hit enemy planes
+    if(b.isPlayer){
+      for(const e of enemies){
+        if(e.alive && circleHit(b.x,b.y,e.x,e.y,PLANE_SIZE)){
+          e.alive=false; bullets.splice(i,1);
+          explode(e.x, e.y);
+          levelEnemiesDestroyed++;
+          totalDestroyed++;
+          const elapsed = performance.now() - levelStartTime;
+          const timeBonus = elapsed < LEVEL_BONUS_TIME ? 50 : 0;
+          totalScore += 100 + timeBonus;
+          scoreDisplay.textContent = totalScore;
+          vibrate(50);
+          break;
+        }
+      }
+    } else {
+      // Hit player
+      if(player.alive && player.invincible<=0 && circleHit(b.x,b.y,player.x,player.y,PLANE_SIZE)){
+        bullets.splice(i,1);
+        playerHit();
+        break;
+      }
+    }
+  }
+
+  // Plane-plane collision (ramming)
+  if(player.alive && player.invincible<=0){
+    for(const e of enemies){
+      if(e.alive && circleHit(player.x,player.y,e.x,e.y,PLANE_SIZE*1.5)){
+        e.alive=false; explode(e.x,e.y);
+        levelEnemiesDestroyed++; totalDestroyed++;
+        totalScore += 100; scoreDisplay.textContent=totalScore;
+        playerHit();
+      }
+    }
+  }
+
+  // Explosions
+  for(let i=explosions.length-1; i>=0; i--){
+    const ex=explosions[i];
+    ex.timer++; ex.r += 1.5;
+    ex.alpha = 1 - ex.timer/EXPLOSION_DURATION;
+    if(ex.timer>=EXPLOSION_DURATION) explosions.splice(i,1);
+  }
+
+  // Check level complete
+  if(enemies.every(e=>!e.alive)){
+    setTimeout(showLevelComplete, 400);
+    state='transition';
+  }
+}
+
+function playerHit(){
+  if(!player.alive) return;
+  explode(player.x, player.y);
+  vibrate([80,30,80]);
+  lives--;
+  updateHUD();
+  if(lives <= 0){
+    player.alive = false;
+    setTimeout(showGameOver, 800);
+    state='transition';
+  } else {
+    // Respawn
+    setTimeout(()=>{
+      if(state==='playing'){
+        player = spawnPlayer();
+        player.invincible = 150;
+      }
+    }, 800);
+  }
+}
+
+function showLevelComplete(){
+  state='level_complete';
+  levelTitle.textContent = currentLevel >= 100 ? 'You Won!' : `Level ${currentLevel} Complete!`;
+  const timeBonus = (performance.now()-levelStartTime) < LEVEL_BONUS_TIME ? 50 : 0;
+  levelScoreMsg.textContent = timeBonus ? 'Quick kill bonus! +50' : '';
+  levelScoreDisplay.textContent = totalScore;
+  levelOverlay.classList.remove('hidden');
+  if(currentLevel >= 100){
+    document.getElementById('next-level-btn').textContent = 'Play Again';
+  }
+}
+
+function showGameOver(){
+  state='gameover';
+  goScore.textContent = totalDestroyed;
+  const isNew = Scores.set('dogfight', totalDestroyed);
+  goHighscore.textContent = isNew ? '★ New High Score!' : `Best: ${Scores.get('dogfight')?.score ?? 0}`;
+  gameoverOverlay.classList.remove('hidden');
+}
+
+/* ── Drawing ── */
+function drawPlane(plane, color){
+  if(!plane.alive) return;
+  const flash = plane.invincible > 0 && Math.floor(plane.invincible/5)%2===0;
+  if(flash) return;
+  ctx.save();
+  ctx.translate(plane.x, plane.y);
+  ctx.rotate(plane.angle);
+  ctx.beginPath();
+  ctx.moveTo(PLANE_SIZE, 0);
+  ctx.lineTo(-PLANE_SIZE, -PLANE_SIZE*0.7);
+  ctx.lineTo(-PLANE_SIZE*0.4, 0);
+  ctx.lineTo(-PLANE_SIZE, PLANE_SIZE*0.7);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  // engine glow
+  ctx.beginPath();
+  ctx.arc(-PLANE_SIZE*0.4, 0, 3, 0, Math.PI*2);
+  ctx.fillStyle = plane.isPlayer ? 'rgba(124,106,247,0.8)' : 'rgba(255,120,0,0.8)';
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawStars(){
+  // Static starfield via seeded positions
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  const rng = createRNG(12345);
+  for(let i=0;i<80;i++){
+    const sx=rng.random()*W, sy=rng.random()*H, ss=rng.random()*1.5+0.5;
+    ctx.beginPath(); ctx.arc(sx,sy,ss,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+  // Background gradient
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#06060f'); grad.addColorStop(1,'#0d0d22');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+  drawStars();
+
+  // Bullets
+  bullets.forEach(b=>{
+    ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2);
+    ctx.fillStyle = b.isPlayer ? '#ffe040' : '#ff6030';
+    ctx.shadowBlur=8; ctx.shadowColor=ctx.fillStyle;
+    ctx.fill(); ctx.shadowBlur=0;
+  });
+
+  // Planes
+  drawPlane(player, '#a0c4ff');
+  enemies.forEach(e => drawPlane(e, '#e74c3c'));
+
+  // Explosions
+  explosions.forEach(ex=>{
+    ctx.beginPath(); ctx.arc(ex.x,ex.y,ex.r,0,Math.PI*2);
+    ctx.strokeStyle = `rgba(255,180,60,${ex.alpha})`;
+    ctx.lineWidth=2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(ex.x,ex.y,ex.r*0.5,0,Math.PI*2);
+    ctx.fillStyle = `rgba(255,80,20,${ex.alpha*0.6})`; ctx.fill();
+  });
+}
+
+/* ── Game loop ── */
+let lastTime=0;
+function loop(ts){
+  if(ts-lastTime >= 16){
+    lastTime=ts;
+    update();
+    if(state!=='start') render();
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ── Buttons ── */
+document.getElementById('start-btn').addEventListener('click',()=>{
+  startOverlay.classList.add('hidden');
+  currentLevel=1; totalScore=0; totalDestroyed=0; lives=3;
+  scoreDisplay.textContent='0';
+  startLevel();
+});
+
+document.getElementById('next-level-btn').addEventListener('click',()=>{
+  levelOverlay.classList.add('hidden');
+  if(currentLevel >= 100){
+    currentLevel=1; totalScore=0; totalDestroyed=0; lives=3;
+    scoreDisplay.textContent='0';
+  } else {
+    currentLevel++;
+  }
+  startLevel();
+});
+
+document.getElementById('restart-btn').addEventListener('click',()=>{
+  gameoverOverlay.classList.add('hidden');
+  currentLevel=1; totalScore=0; totalDestroyed=0; lives=3;
+  scoreDisplay.textContent='0';
+  startLevel();
+});
+
+// Prevent context menu on canvas
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

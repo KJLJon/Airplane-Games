@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <base href="/airplane-games/">
+  <title>Traffic Director — Airplane Games</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    :root { --game-color: #f7a94a; }
+    body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; background: var(--bg-deep); }
+    .game-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; background: var(--bg-panel); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+    .game-header h1 { flex: 1; font-size: 1.1rem; font-weight: 700; font-family: 'Outfit', sans-serif; }
+    .score-group { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+    .score-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); }
+    .score-value { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--game-color); font-variant-numeric: tabular-nums; }
+    #game-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem; overflow: hidden; position: relative; touch-action: none; }
+    #gameCanvas { display: block; border-radius: 8px; border: 1px solid var(--border-subtle); cursor: pointer; max-width: 100%; max-height: 100%; }
+    #overlay { position: absolute; inset: 0; background: rgba(13,13,16,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; z-index: 20; border-radius: 8px; }
+    #overlay h2 { font-family: 'Outfit', sans-serif; font-size: 1.6rem; color: var(--game-color); text-align: center; }
+    #overlay p { color: var(--text-dim); text-align: center; max-width: 280px; font-size: 0.9rem; line-height: 1.5; }
+    .start-btn { padding: 0.85rem 2.5rem; border: 2px solid var(--game-color); border-radius: 10px; background: rgba(247,169,74,0.12); color: var(--game-color); font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: background 0.15s; min-height: 52px; }
+    .start-btn:hover { background: rgba(247,169,74,0.25); }
+    #over-panel { position: absolute; inset: 0; background: rgba(13,13,16,0.97); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; z-index: 30; border-radius: 8px; }
+    #over-panel.show { display: flex; }
+    #over-panel h2 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; }
+    .over-stat { color: var(--text-dim); font-size: 0.95rem; }
+    .over-stat span { color: var(--game-color); font-weight: 700; }
+    #hint { font-size: 0.75rem; color: var(--text-dim); text-align: center; padding: 4px; }
+  </style>
+</head>
+<body>
+<header class="game-header">
+  <a href="/airplane-games/" class="btn btn-back">← Hub</a>
+  <h1>🚦 Traffic</h1>
+  <div class="score-group">
+    <span class="score-label">Score</span>
+    <span class="score-value" id="score-display">0</span>
+  </div>
+  <div class="score-group">
+    <span class="score-label">Best</span>
+    <span class="score-value" id="best-display">0</span>
+  </div>
+</header>
+
+<div id="game-area">
+  <canvas id="gameCanvas"></canvas>
+  <div id="hint">Tap traffic lights to toggle red/green</div>
+
+  <div id="overlay">
+    <h2>🚦 Traffic Director</h2>
+    <p>Manage the intersection! Tap traffic lights to let vehicles pass. Don't let them crash!</p>
+    <button class="start-btn" onclick="startGame()">Start Game</button>
+    <p style="font-size:0.75rem;margin-top:0;color:var(--text-dim)">Best: <span id="menu-best" style="color:var(--game-color)">0</span></p>
+  </div>
+
+  <div id="over-panel">
+    <h2>💥 Crash!</h2>
+    <div class="over-stat">Score: <span id="over-score">0</span></div>
+    <div class="over-stat">Best: <span id="over-best">0</span></div>
+    <button class="start-btn" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<script src="js/shared.js"></script>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, CX, CY, ROAD, LANE;
+let vehicles = [], lights = [], score = 0, best = 0, running = false;
+let spawnTimer = 0, spawnInterval = 3000, diffTimer = 0, animId;
+let vehicleId = 0;
+
+// Traffic light state: north, east, south, west (green = vehicles from that direction can pass)
+// lights[i]: { dir, x, y, green }
+
+function resize() {
+  const area = document.getElementById('game-area');
+  const side = Math.min(area.clientWidth, area.clientHeight - 30) - 8;
+  canvas.width = side;
+  canvas.height = side;
+  W = H = side;
+  CX = W / 2; CY = H / 2;
+  ROAD = Math.floor(W * 0.28); // road width
+  LANE = ROAD / 2;
+}
+
+function initLights() {
+  // 4 lights at corners of the intersection
+  const hw = ROAD / 2 + 8;
+  lights = [
+    { dir: 'N', x: CX - hw, y: CY - hw, green: false }, // top-left corner, controls N traffic
+    { dir: 'E', x: CX + hw, y: CY - hw, green: true  }, // top-right, controls E
+    { dir: 'S', x: CX + hw, y: CY + hw, green: false }, // bottom-right, controls S
+    { dir: 'W', x: CX - hw, y: CY + hw, green: true  }, // bottom-left, controls W
+  ];
+}
+
+function isGreen(dir) {
+  const l = lights.find(l => l.dir === dir);
+  return l ? l.green : false;
+}
+
+function startGame() {
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('over-panel').classList.remove('show');
+  resize();
+  initLights();
+  vehicles = [];
+  score = 0;
+  spawnTimer = 0;
+  spawnInterval = 3000;
+  diffTimer = 0;
+  running = true;
+  updateScoreDisplay();
+  if (animId) cancelAnimationFrame(animId);
+  let last = performance.now();
+  function loop(ts) {
+    const dt = Math.min(ts - last, 100);
+    last = ts;
+    if (running) {
+      update(dt);
+      draw();
+      animId = requestAnimationFrame(loop);
+    }
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+// Vehicle paths: each direction has entry/exit points
+// Direction means "coming FROM that direction" (so N = entering from top)
+function spawnVehicle() {
+  const dirs = ['N','E','S','W'];
+  const dir = dirs[Math.floor(Math.random() * dirs.length)];
+  const types = [
+    { type:'car',   w:LANE*0.55, h:LANE*0.85, color:'#e74c3c', speed:1.4 },
+    { type:'car',   w:LANE*0.55, h:LANE*0.85, color:'#3498db', speed:1.3 },
+    { type:'car',   w:LANE*0.55, h:LANE*0.85, color:'#f1c40f', speed:1.5 },
+    { type:'truck', w:LANE*0.6,  h:LANE*1.15, color:'#7f8c8d', speed:0.9 },
+    { type:'truck', w:LANE*0.6,  h:LANE*1.15, color:'#27ae60', speed:1.0 },
+  ];
+  const vt = types[Math.floor(Math.random() * types.length)];
+  // Turn destination: can go straight or turn
+  const turns = ['straight','left','right'];
+  const turn = turns[Math.floor(Math.random() * turns.length)];
+
+  // Build path waypoints
+  const path = buildPath(dir, turn);
+
+  vehicles.push({
+    id: vehicleId++,
+    ...vt,
+    dir,
+    turn,
+    path,
+    pathIdx: 0,
+    x: path[0].x,
+    y: path[0].y,
+    angle: path[0].angle,
+    patience: 12000,
+    maxPatience: 12000,
+    passed: false,
+    collided: false,
+    baseSpeed: vt.speed,
+  });
+}
+
+function buildPath(fromDir, turn) {
+  // Entry lane offset from road center
+  const hw = ROAD / 2;
+  const laneOff = LANE / 2;
+  // Points: entry → before light → intersection center → exit
+  // Directions of travel:
+  // N: entering from top, moving downward → goes through CX - laneOff (right lane coming down)
+  // E: entering from right, moving left → CY - laneOff
+  // S: entering from bottom, moving upward → CX + laneOff
+  // W: entering from left, moving right → CY + laneOff
+
+  const pts = [];
+
+  if (fromDir === 'N') {
+    const x = CX - laneOff;
+    pts.push({x, y: -50, angle: Math.PI/2, type:'move'});
+    pts.push({x, y: CY - hw - 10, angle: Math.PI/2, type:'stop', lightDir:'N'});
+    // intersection entry
+    if (turn === 'straight') {
+      pts.push({x, y: CY + hw + 10, angle: Math.PI/2, type:'move'});
+      pts.push({x, y: H + 50, angle: Math.PI/2, type:'exit'});
+    } else if (turn === 'right') {
+      pts.push({x, y: CY, angle: Math.PI/2, type:'move'});
+      pts.push({x: CX + hw + 10, y: CY, angle: 0, type:'move'});
+      pts.push({x: W + 50, y: CY, angle: 0, type:'exit'});
+    } else { // left
+      pts.push({x, y: CY + laneOff, angle: Math.PI/2, type:'move'});
+      pts.push({x: CX - hw - 10, y: CY + laneOff, angle: Math.PI, type:'move'});
+      pts.push({x: -50, y: CY + laneOff, angle: Math.PI, type:'exit'});
+    }
+  } else if (fromDir === 'S') {
+    const x = CX + laneOff;
+    pts.push({x, y: H + 50, angle: -Math.PI/2, type:'move'});
+    pts.push({x, y: CY + hw + 10, angle: -Math.PI/2, type:'stop', lightDir:'S'});
+    if (turn === 'straight') {
+      pts.push({x, y: CY - hw - 10, angle: -Math.PI/2, type:'move'});
+      pts.push({x, y: -50, angle: -Math.PI/2, type:'exit'});
+    } else if (turn === 'right') {
+      pts.push({x, y: CY, angle: -Math.PI/2, type:'move'});
+      pts.push({x: CX - hw - 10, y: CY, angle: Math.PI, type:'move'});
+      pts.push({x: -50, y: CY, angle: Math.PI, type:'exit'});
+    } else {
+      pts.push({x, y: CY - laneOff, angle: -Math.PI/2, type:'move'});
+      pts.push({x: CX + hw + 10, y: CY - laneOff, angle: 0, type:'move'});
+      pts.push({x: W + 50, y: CY - laneOff, angle: 0, type:'exit'});
+    }
+  } else if (fromDir === 'E') {
+    const y = CY - laneOff;
+    pts.push({x: W + 50, y, angle: Math.PI, type:'move'});
+    pts.push({x: CX + hw + 10, y, angle: Math.PI, type:'stop', lightDir:'E'});
+    if (turn === 'straight') {
+      pts.push({x: CX - hw - 10, y, angle: Math.PI, type:'move'});
+      pts.push({x: -50, y, angle: Math.PI, type:'exit'});
+    } else if (turn === 'right') {
+      pts.push({x: CX, y, angle: Math.PI, type:'move'});
+      pts.push({x: CX, y: CY + hw + 10, angle: Math.PI/2, type:'move'});
+      pts.push({x: CX, y: H + 50, angle: Math.PI/2, type:'exit'});
+    } else {
+      pts.push({x: CX + laneOff, y, angle: Math.PI, type:'move'});
+      pts.push({x: CX + laneOff, y: CY - hw - 10, angle: -Math.PI/2, type:'move'});
+      pts.push({x: CX + laneOff, y: -50, angle: -Math.PI/2, type:'exit'});
+    }
+  } else { // W
+    const y = CY + laneOff;
+    pts.push({x: -50, y, angle: 0, type:'move'});
+    pts.push({x: CX - hw - 10, y, angle: 0, type:'stop', lightDir:'W'});
+    if (turn === 'straight') {
+      pts.push({x: CX + hw + 10, y, angle: 0, type:'move'});
+      pts.push({x: W + 50, y, angle: 0, type:'exit'});
+    } else if (turn === 'right') {
+      pts.push({x: CX, y, angle: 0, type:'move'});
+      pts.push({x: CX, y: CY - hw - 10, angle: -Math.PI/2, type:'move'});
+      pts.push({x: CX, y: -50, angle: -Math.PI/2, type:'exit'});
+    } else {
+      pts.push({x: CX - laneOff, y, angle: 0, type:'move'});
+      pts.push({x: CX - laneOff, y: CY + hw + 10, angle: Math.PI/2, type:'move'});
+      pts.push({x: CX - laneOff, y: H + 50, angle: Math.PI/2, type:'exit'});
+    }
+  }
+  return pts;
+}
+
+function update(dt) {
+  spawnTimer += dt;
+  diffTimer += dt;
+
+  if (diffTimer > 30000) {
+    diffTimer = 0;
+    spawnInterval = Math.max(1200, spawnInterval - 300);
+  }
+
+  if (spawnTimer >= spawnInterval) {
+    spawnTimer = 0;
+    spawnVehicle();
+    if (vehicles.length > 2 && Math.random() < 0.4) spawnVehicle();
+  }
+
+  // Update vehicles
+  for (const v of vehicles) {
+    if (v.passed || v.collided) continue;
+    v.patience -= dt;
+
+    if (v.pathIdx >= v.path.length - 1) {
+      v.passed = true;
+      score++;
+      updateScoreDisplay();
+      continue;
+    }
+
+    const target = v.path[v.pathIdx + 1];
+    const dx = target.x - v.x;
+    const dy = target.y - v.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    // Check if this is a stop point
+    if (target.type === 'stop' && !isGreen(target.lightDir)) {
+      // Stop before light - slow down
+      if (dist < 5) {
+        // Stay stopped
+        continue;
+      }
+      // Slow down as approaching
+      const slowFactor = Math.min(1, dist / 30);
+      const spd = v.baseSpeed * slowFactor * (W / 400);
+      if (dist < spd + 1) {
+        v.x = target.x; v.y = target.y;
+        continue;
+      }
+      v.x += (dx / dist) * spd;
+      v.y += (dy / dist) * spd;
+      v.angle = Math.atan2(dy, dx);
+      continue;
+    }
+
+    // Normal movement
+    const spd = v.baseSpeed * (W / 400);
+    if (dist <= spd) {
+      v.x = target.x;
+      v.y = target.y;
+      v.angle = target.angle;
+      v.pathIdx++;
+    } else {
+      v.x += (dx / dist) * spd;
+      v.y += (dy / dist) * spd;
+      v.angle = Math.atan2(dy, dx);
+    }
+  }
+
+  // Check collisions (bounding box overlap for vehicles in intersection)
+  for (let i = 0; i < vehicles.length; i++) {
+    const a = vehicles[i];
+    if (a.passed || a.collided) continue;
+    for (let j = i + 1; j < vehicles.length; j++) {
+      const b = vehicles[j];
+      if (b.passed || b.collided) continue;
+      if (overlap(a, b)) {
+        running = false;
+        a.collided = b.collided = true;
+        draw();
+        setTimeout(() => endGame(), 600);
+        return;
+      }
+    }
+  }
+
+  // Remove exited vehicles
+  vehicles = vehicles.filter(v => {
+    if (v.passed) return false;
+    if (v.collided) return true; // keep for drawing
+    if (v.patience <= 0) return false; // left in disgust
+    return true;
+  });
+}
+
+function overlap(a, b) {
+  const aw = a.w/2, ah = a.h/2, bw = b.w/2, bh = b.h/2;
+  // Simple AABB (ignoring rotation for performance)
+  const gap = 2;
+  return Math.abs(a.x - b.x) < aw + bw - gap &&
+         Math.abs(a.y - b.y) < ah + bh - gap;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Background (grass)
+  ctx.fillStyle = '#1a3a1a';
+  ctx.fillRect(0, 0, W, H);
+
+  // Roads
+  const hw = ROAD / 2;
+  ctx.fillStyle = '#2c2c2c';
+  // Horizontal road
+  ctx.fillRect(0, CY - hw, W, ROAD);
+  // Vertical road
+  ctx.fillRect(CX - hw, 0, ROAD, H);
+
+  // Road markings
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([20, 20]);
+  // Center lines
+  ctx.beginPath(); ctx.moveTo(0, CY); ctx.lineTo(CX - hw, CY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(CX + hw, CY); ctx.lineTo(W, CY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(CX, 0); ctx.lineTo(CX, CY - hw); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(CX, CY + hw); ctx.lineTo(CX, H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Road edges
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(CX - hw, 0, ROAD, CY - hw);
+  ctx.strokeRect(0, CY - hw, CX - hw, ROAD);
+  ctx.strokeRect(CX + hw, CY - hw, W - CX - hw, ROAD);
+  ctx.strokeRect(CX - hw, CY + hw, ROAD, H - CY - hw);
+
+  // Intersection box
+  ctx.fillStyle = '#333';
+  ctx.fillRect(CX - hw, CY - hw, ROAD, ROAD);
+
+  // Traffic lights
+  lights.forEach((l, i) => {
+    const r = Math.max(8, W * 0.022);
+    // Light housing
+    ctx.fillStyle = '#1a1a1a';
+    roundRect(ctx, l.x - r*1.3, l.y - r*1.3, r*2.6, r*2.6, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Light circle
+    ctx.fillStyle = l.green ? '#2ecc71' : '#e74c3c';
+    ctx.shadowColor = l.green ? '#2ecc71' : '#e74c3c';
+    ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(l.x, l.y, r, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    // Direction label
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(8,r*0.8)}px Inter,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(l.dir, l.x, l.y);
+  });
+
+  // Vehicles
+  vehicles.forEach(v => {
+    if (!v) return;
+    ctx.save();
+    ctx.translate(v.x, v.y);
+    ctx.rotate(v.angle);
+
+    // Body
+    ctx.fillStyle = v.collided ? '#ff0000' : v.color;
+    if (v.collided) {
+      ctx.shadowColor = '#ff0000';
+      ctx.shadowBlur = 15;
+    }
+    roundRect(ctx, -v.w/2, -v.h/2, v.w, v.h, 3);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Windshield
+    ctx.fillStyle = 'rgba(200,230,255,0.7)';
+    const wh = v.h * 0.25;
+    ctx.fillRect(-v.w*0.35, -v.h/2 + 3, v.w*0.7, wh);
+
+    // Wheels
+    ctx.fillStyle = '#111';
+    const wr = v.w * 0.18, wl = v.h * 0.2;
+    [[-v.w/2-1, -v.h*0.27],[v.w/2+1-wl, -v.h*0.27],
+     [-v.w/2-1,  v.h*0.07],[v.w/2+1-wl,  v.h*0.07]].forEach(([wx,wy]) => {
+      ctx.fillRect(wx, wy, wl, wr);
+    });
+
+    ctx.restore();
+
+    // Patience bar
+    if (!v.passed && !v.collided) {
+      const bw = Math.max(20, v.h);
+      const bh = 4;
+      const bx = v.x - bw/2;
+      const by = v.y - v.h/2 - 8;
+      const pct = Math.max(0, v.patience / v.maxPatience);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = pct > 0.5 ? '#2ecc71' : pct > 0.25 ? '#f1c40f' : '#e74c3c';
+      ctx.fillRect(bx, by, bw * pct, bh);
+    }
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function endGame() {
+  running = false;
+  cancelAnimationFrame(animId);
+  Scores.set('traffic', score);
+  best = Math.max(best, score);
+  document.getElementById('over-score').textContent = score;
+  document.getElementById('over-best').textContent = best;
+  document.getElementById('over-panel').classList.add('show');
+}
+
+function updateScoreDisplay() {
+  document.getElementById('score-display').textContent = score;
+  const b = Scores.get('traffic');
+  best = b ? Math.max(b.score, score) : score;
+  document.getElementById('best-display').textContent = best;
+}
+
+// Click to toggle lights
+canvas.addEventListener('click', e => {
+  if (!running) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  lights.forEach(l => {
+    const dx = mx - l.x, dy = my - l.y;
+    if (dx*dx + dy*dy < (W*0.045)*(W*0.045)) {
+      l.green = !l.green;
+    }
+  });
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  const mx = (touch.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (touch.clientY - rect.top) * (canvas.height / rect.height);
+  if (!running) return;
+  lights.forEach(l => {
+    const dx = mx - l.x, dy = my - l.y;
+    if (dx*dx + dy*dy < (W*0.055)*(W*0.055)) {
+      l.green = !l.green;
+    }
+  });
+}, {passive: false});
+
+window.addEventListener('resize', () => {
+  if (running) { resize(); initLights(); }
+});
+
+// Init
+resize();
+const initBest = Scores.get('traffic');
+best = initBest ? initBest.score : 0;
+document.getElementById('menu-best').textContent = best;
+document.getElementById('best-display').textContent = best;
+draw();
+</script>
+</body>
+</html>
