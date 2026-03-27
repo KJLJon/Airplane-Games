@@ -26,6 +26,8 @@
     .sq.legal::after { content:''; position:absolute; width:35%; height:35%; background:rgba(0,0,0,0.25); border-radius:50%; pointer-events:none; }
     .sq.last-move { background:rgba(247,169,74,0.4) !important; }
     .piece { font-size:clamp(1.4rem,6vw,2.2rem); line-height:1; pointer-events:none; user-select:none; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
+    .piece.white { color:#222; }
+    .piece.black { color:#f0f0f5; }
     .controls { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
     #hint-btn { }
     #hints-left { color:var(--text-dim); font-size:0.8rem; }
@@ -144,7 +146,7 @@
       if(legal.includes(idx)) sq.classList.add('legal');
       if(board[idx]) {
         const piece=document.createElement('span');
-        piece.className='piece';
+        piece.className='piece '+(WPCS.includes(board[idx])?'white':'black');
         piece.textContent=SYMBOLS[board[idx]]||'';
         sq.appendChild(piece);
       }
