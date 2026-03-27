@@ -3,619 +3,455 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1a1a2e">
-  <meta name="description" content="Lane Shooter – Survive waves of enemies">
   <base href="/Airplane-Games/">
-  <title>Lane Shooter - Airplane Games</title>
+  <title>Lane Shooter — Airplane Games</title>
   <link rel="stylesheet" href="css/main.css">
   <style>
-    body {
-      background: var(--bg-deep);
-      color: var(--text-primary);
-      font-family: 'Inter', system-ui, sans-serif;
-      min-height: 100vh;
-      overflow: hidden;
+    body { overflow: hidden; display: flex; flex-direction: column; height: 100dvh; }
+    .game-wrap {
+      flex: 1; position: relative; display: flex; align-items: center;
+      justify-content: center; background: #06080f; touch-action: none;
     }
-
-    .game-wrapper {
-      position: relative;
-      width: 100%;
-      height: 100dvh;
-      display: flex;
-      flex-direction: column;
+    canvas { display: block; }
+    #overlay {
+      display: none; position: absolute; inset: 0;
+      background: rgba(0,0,0,0.85); align-items: center;
+      justify-content: center; z-index: 10;
     }
-
-    .hud {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem;
-      background: rgba(0, 0, 0, 0.3);
-      border-bottom: 1px solid var(--border-subtle);
-      z-index: 10;
+    #overlay.show { display: flex; }
+    .card {
+      background: #1a1a2e; border: 1px solid #333; border-radius: 14px;
+      padding: 28px; text-align: center; max-width: 320px; width: 88%;
     }
-
-    .back-button {
-      width: 2.2rem;
-      height: 2.2rem;
-      border-radius: 50%;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-subtle);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-    }
-
-    .back-button:hover {
-      background: var(--bg-hover);
-      transform: translateX(-3px);
-    }
-
-    .hud-title {
-      font-weight: 700;
-      font-size: 1rem;
-    }
-
-    .hud-stats {
-      display: flex;
-      gap: 2rem;
-      align-items: center;
-    }
-
-    .stat {
-      text-align: center;
-    }
-
-    .stat-label {
-      font-size: 0.7rem;
-      color: var(--text-dim);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    .stat-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--accent-primary);
-    }
-
-    #canvas {
-      flex: 1;
-      display: block;
-      background: linear-gradient(180deg, rgba(50, 100, 150, 0.2) 0%, rgba(30, 50, 80, 0.3) 100%);
-      cursor: crosshair;
-    }
-
-    .game-over-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.8);
-      z-index: 100;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .game-over-overlay.active {
-      display: flex;
-    }
-
-    .game-over-card {
-      background: var(--bg-elevated);
-      border: 2px solid var(--border-subtle);
-      border-radius: 1rem;
-      padding: 2rem;
-      text-align: center;
-      max-width: 400px;
-    }
-
-    .game-over-card h2 {
-      font-size: 2rem;
-      margin: 0 0 1rem;
-      color: var(--accent-primary);
-    }
-
-    .final-score {
-      font-size: 2.5rem;
-      font-weight: 700;
-      color: #3498db;
-      margin: 1rem 0;
-    }
-
-    .game-over-card p {
-      color: var(--text-dim);
-      margin: 1rem 0;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1.5rem;
-      justify-content: center;
-    }
-
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 0.5rem;
-      font-family: 'Inter', system-ui, sans-serif;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent-primary) 0%, #7c3aed 100%);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(159, 122, 234, 0.4);
-    }
-
-    .btn-secondary {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-      border: 1px solid var(--border-subtle);
-    }
-
-    .btn-secondary:hover {
-      background: var(--border-subtle);
-    }
-
-    @media (max-width: 600px) {
-      .hud {
-        padding: 0.75rem;
-      }
-
-      .hud-stats {
-        gap: 1rem;
-      }
-
-      .stat-value {
-        font-size: 1.2rem;
-      }
-    }
+    .card h2 { margin: 0 0 8px; font-size: 1.8rem; }
+    .big-num { font-size: 3rem; font-weight: 800; color: #3b82f6; margin: 12px 0; }
+    .sub  { color: #888; font-size: 0.9rem; margin: 4px 0; }
+    .btn-row { display: flex; gap: 12px; margin-top: 20px; justify-content: center; flex-wrap: wrap; }
+    .btn-dark { background: #333; }
   </style>
-  <script src="js/shared.js" defer></script>
 </head>
 <body>
-  <div class="game-wrapper">
-    <div class="hud">
-      <button class="back-button" onclick="window.history.back()" title="Back">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 12H5M12 19l-7-7 7-7"/>
-        </svg>
-      </button>
-      <div class="hud-title">LANE SHOOTER</div>
-      <div class="hud-stats">
-        <div class="stat">
-          <div class="stat-label">Score</div>
-          <div class="stat-value" id="score">0</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Wave</div>
-          <div class="stat-value" id="wave">1</div>
-        </div>
-      </div>
-    </div>
-    <canvas id="canvas"></canvas>
-  </div>
+<header class="game-header">
+  <a href="/Airplane-Games/" class="btn btn-back">← Hub</a>
+  <h1 class="game-title">Lane Shooter</h1>
+  <div class="score-display" id="score-display">Best: 0</div>
+</header>
 
-  <div class="game-over-overlay" id="gameOverOverlay">
-    <div class="game-over-card">
-      <h2>Game Over!</h2>
-      <p id="gameOverMessage">You survived for a great run!</p>
-      <div class="final-score" id="finalScore">0</div>
-      <p id="bestScore"></p>
-      <div class="button-group">
-        <button class="btn btn-primary" onclick="location.reload()">Play Again</button>
-        <button class="btn btn-secondary" onclick="window.history.back()">Back to Hub</button>
+<div class="game-wrap" id="wrap">
+  <canvas id="c"></canvas>
+  <div id="overlay" class="show">
+    <div class="card" id="card">
+      <h2>Lane Shooter</h2>
+      <p class="sub">Shoot enemies before they reach you!</p>
+      <p class="sub" style="margin-top:8px">← → arrows or tap a lane to move</p>
+      <p class="sub">Cannon auto-fires — collect power-ups!</p>
+      <div class="btn-row">
+        <button class="btn" id="startBtn">Play</button>
       </div>
     </div>
   </div>
+</div>
 
-  <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 70;
-    canvas.style.maxWidth = '100vw';
-    canvas.style.maxHeight = '100vh';
+<script src="js/shared.js"></script>
+<script>
+'use strict';
 
-    const GAME_ID = 'lane-shooter';
-    const NUM_LANES = 3;
-    const LANE_WIDTH = canvas.width / NUM_LANES;
-    const CANNON_SIZE = 20;
+const GAME_ID = 'lane-shooter';
+const LW = 360, LH = 620;
+const NLANES = 5;
+const LANE_W = LW / NLANES;          // 72px
+const CANNON_Y = LH - 52;
+const BULLET_R = 5;
 
-    let gameState = {
-      score: 0,
-      wave: 1,
-      health: 3,
-      cannonX: canvas.width / 2,
-      gameActive: true,
-      gameOver: false,
-      finalScore: 0,
-      shootCooldown: 0,
-      powerUpCooldown: 0
-    };
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('wrap');
+let scale = 1;
 
-    const enemies = [];
-    const bullets = [];
-    const explosions = [];
-    const powerUps = [];
-    let nextEnemyId = 0;
-    let nextBulletId = 0;
+function resize() {
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  scale = Math.min(ww / LW, wh / LH);
+  canvas.width = LW; canvas.height = LH;
+  canvas.style.width  = (LW * scale) + 'px';
+  canvas.style.height = (LH * scale) + 'px';
+}
+window.addEventListener('resize', resize);
+resize();
 
-    let waveStartTime = Date.now();
-    let enemySpawnRate = 1500;
+function laneX(l) { return LANE_W * l + LANE_W / 2; }
 
-    // Load best score
-    function loadBestScore() {
-      if (typeof Scores !== 'undefined') {
-        const record = Scores.get(GAME_ID);
-        if (record && record.score > 0) {
-          return record.score;
+// ── Game state ───────────────────────────────────────────────
+let G, rafId, running = false;
+
+function newGame() {
+  G = {
+    lane: 2,
+    score: 0,
+    wave: 1,
+    hp: 3,
+    fireTimer: 0,
+    fireCd: 26,         // frames between auto-shots
+    waveKills: 0,
+    waveGoal: 12,
+    enemies: [],
+    bullets: [],
+    particles: [],
+    powerUps: [],
+    shieldUp: false,
+    rapidLeft: 0,       // frames of rapid-fire remaining
+    time: 0,
+    spawnTimer: 0,
+    spawnCd: 80,
+    over: false,
+  };
+}
+
+// ── Spawning ─────────────────────────────────────────────────
+function spawnEnemy() {
+  const lane    = Math.floor(Math.random() * NLANES);
+  const armored = G.wave >= 3 && Math.random() < 0.22;
+  const fast    = G.wave >= 2 && Math.random() < 0.20;
+  G.enemies.push({
+    lane, x: laneX(lane), y: -22,
+    hp:    armored ? 3 : 1,
+    maxHp: armored ? 3 : 1,
+    speed: (fast ? 3.2 : 1.8) + G.wave * 0.22,
+    r:     armored ? 22 : 18,
+    color: armored ? '#f97316' : fast ? '#e879f9' : '#ef4444',
+    fast,
+  });
+}
+
+function tryDropPowerUp(x, y) {
+  if (Math.random() > 0.28) return;
+  const types = ['rapid', 'wide', 'hp'];
+  G.powerUps.push({
+    x, y,
+    type: types[Math.floor(Math.random() * types.length)],
+    speed: 1.4, r: 12,
+  });
+}
+
+function powerColor(t) {
+  return t === 'rapid' ? '#fbbf24' : t === 'wide' ? '#60a5fa' : '#a78bfa';
+}
+
+// ── Update ───────────────────────────────────────────────────
+function update() {
+  if (G.over) return;
+  G.time++;
+
+  const cd = G.rapidLeft > 0 ? Math.ceil(G.fireCd / 3) : G.fireCd;
+  G.fireTimer++;
+  if (G.fireTimer >= cd) {
+    G.fireTimer = 0;
+    G.bullets.push({ x: laneX(G.lane), y: CANNON_Y - 22 });
+    if (G.rapidLeft > 0) G.rapidLeft--;
+  }
+
+  // Spawn enemies
+  G.spawnTimer++;
+  if (G.spawnTimer >= G.spawnCd) {
+    G.spawnTimer = 0;
+    spawnEnemy();
+    G.spawnCd = Math.max(28, 80 - G.wave * 7);
+  }
+
+  // Move bullets + collision
+  for (let i = G.bullets.length - 1; i >= 0; i--) {
+    const b = G.bullets[i];
+    b.y -= 11;
+    if (b.y < -12) { G.bullets.splice(i, 1); continue; }
+    let hit = false;
+    for (let j = G.enemies.length - 1; j >= 0; j--) {
+      const e = G.enemies[j];
+      if (Math.abs(b.x - e.x) < e.r + BULLET_R && Math.abs(b.y - e.y) < e.r + BULLET_R) {
+        e.hp--;
+        burst(b.x, b.y, '#fde68a', 5);
+        G.bullets.splice(i, 1);
+        hit = true;
+        if (e.hp <= 0) {
+          G.score += e.fast ? 30 : e.maxHp > 1 ? 20 : 10;
+          G.waveKills++;
+          burst(e.x, e.y, e.color, 14);
+          tryDropPowerUp(e.x, e.y);
+          G.enemies.splice(j, 1);
+          checkWave();
         }
-      }
-      return 0;
-    }
-
-    // Save score
-    function saveScore(score) {
-      if (typeof Scores !== 'undefined') {
-        Scores.set(GAME_ID, score);
+        break;
       }
     }
+    if (hit) continue;
+  }
 
-    // Enemy class
-    class Enemy {
-      constructor(lane) {
-        this.id = nextEnemyId++;
-        this.lane = lane;
-        this.x = lane * LANE_WIDTH + LANE_WIDTH / 2;
-        this.y = -20;
-        this.speed = 2 + gameState.wave * 0.3;
-        this.size = 15;
-        this.health = 1;
+  // Move enemies
+  for (let i = G.enemies.length - 1; i >= 0; i--) {
+    const e = G.enemies[i];
+    e.y += e.speed;
+    if (e.y > LH + e.r) {
+      if (G.shieldUp) {
+        G.shieldUp = false;
+        showToast('Shield blocked a hit!');
+      } else {
+        G.hp--;
+        burst(e.x, CANNON_Y, '#ef4444', 16);
+        if (G.hp <= 0) { G.enemies.splice(i, 1); G.over = true; endGame(); return; }
       }
+      G.enemies.splice(i, 1);
+    }
+  }
 
-      draw() {
-        ctx.fillStyle = '#e74c3c';
-        ctx.shadowColor = '#e74c3c';
-        ctx.shadowBlur = 10;
+  // Move power-ups
+  const canX = laneX(G.lane);
+  for (let i = G.powerUps.length - 1; i >= 0; i--) {
+    const p = G.powerUps[i];
+    p.y += p.speed;
+    if (Math.abs(p.x - canX) < 44 && Math.abs(p.y - CANNON_Y) < 44) {
+      applyPowerUp(p.type);
+      burst(p.x, p.y, powerColor(p.type), 10);
+      G.powerUps.splice(i, 1);
+    } else if (p.y > LH + 20) {
+      G.powerUps.splice(i, 1);
+    }
+  }
+
+  // Particles
+  for (let i = G.particles.length - 1; i >= 0; i--) {
+    const p = G.particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.10;
+    p.life--;
+    if (p.life <= 0) G.particles.splice(i, 1);
+  }
+}
+
+function checkWave() {
+  if (G.waveKills >= G.waveGoal) {
+    G.wave++;
+    G.waveKills = 0;
+    G.waveGoal  = 12 + G.wave * 5;
+    showToast('Wave ' + G.wave + '!');
+  }
+}
+
+function applyPowerUp(type) {
+  if (type === 'rapid') {
+    G.rapidLeft = 140;
+    showToast('Rapid Fire!');
+  } else if (type === 'wide') {
+    for (let l = 0; l < NLANES; l++)
+      G.bullets.push({ x: laneX(l), y: CANNON_Y - 22 });
+    showToast('Wide Shot!');
+  } else {
+    if (G.hp < 3) { G.hp++; showToast('+1 Life!'); }
+    else { G.shieldUp = true; showToast('Shield up!'); }
+  }
+}
+
+function burst(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 4;
+    G.particles.push({
+      x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.5,
+      color, life: 18 + Math.random() * 14, r: 2 + Math.random() * 3,
+    });
+  }
+}
+
+// ── Draw ─────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, LW, LH);
+
+  // Lane stripes
+  for (let l = 0; l < NLANES; l++) {
+    ctx.fillStyle = l % 2 === 0 ? '#090d1a' : '#0c1122';
+    ctx.fillRect(l * LANE_W, 0, LANE_W, LH);
+  }
+
+  // Active lane highlight
+  ctx.fillStyle = 'rgba(59,130,246,0.09)';
+  ctx.fillRect(G.lane * LANE_W, 0, LANE_W, LH);
+
+  // Lane dividers
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  for (let l = 1; l < NLANES; l++) {
+    ctx.beginPath();
+    ctx.moveTo(l * LANE_W, 0); ctx.lineTo(l * LANE_W, LH);
+    ctx.stroke();
+  }
+
+  // Danger zone at bottom
+  ctx.fillStyle = '#1a0505';
+  ctx.fillRect(0, CANNON_Y - 28, LW, LH - CANNON_Y + 28);
+  ctx.strokeStyle = '#3b1111';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, CANNON_Y - 28); ctx.lineTo(LW, CANNON_Y - 28);
+  ctx.stroke();
+
+  // Power-ups
+  for (const p of G.powerUps) {
+    const col = powerColor(p.type);
+    ctx.shadowColor = col; ctx.shadowBlur = 10;
+    ctx.fillStyle = col + 'bb';
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 8px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText({ rapid: 'FAST', wide: 'WIDE', hp: 'HP' }[p.type], p.x, p.y);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // Enemies
+  for (const e of G.enemies) {
+    ctx.shadowColor = e.color; ctx.shadowBlur = 8;
+    ctx.fillStyle = e.color;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    // HP pips
+    if (e.maxHp > 1) {
+      for (let h = 0; h < e.maxHp; h++) {
+        ctx.fillStyle = h < e.hp ? '#fff' : 'rgba(255,255,255,0.25)';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.arc(e.x - (e.maxHp - 1) * 5 + h * 10, e.y + e.r + 5, 3, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
-
-        ctx.strokeStyle = '#c0392b';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      update() {
-        this.y += this.speed;
       }
     }
+    // Eyes
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.arc(e.x - 5, e.y - 4, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(e.x + 5, e.y - 4, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(e.x - 5, e.y - 4, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(e.x + 5, e.y - 4, 2, 0, Math.PI * 2); ctx.fill();
+  }
 
-    // Bullet class
-    class Bullet {
-      constructor(x, y) {
-        this.id = nextBulletId++;
-        this.x = x;
-        this.y = y;
-        this.speed = 6;
-        this.size = 5;
-      }
+  // Bullets
+  ctx.shadowColor = '#93c5fd'; ctx.shadowBlur = 8;
+  ctx.fillStyle = '#93c5fd';
+  for (const b of G.bullets) {
+    ctx.beginPath(); ctx.arc(b.x, b.y, BULLET_R, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
 
-      draw() {
-        ctx.fillStyle = '#3498db';
-        ctx.shadowColor = '#3498db';
-        ctx.shadowBlur = 10;
-        ctx.fillRect(this.x - this.size / 2, this.y - this.size, this.size, this.size * 2);
-        ctx.shadowBlur = 0;
-      }
+  // Cannon
+  const cx = laneX(G.lane);
+  if (G.shieldUp) {
+    ctx.strokeStyle = 'rgba(167,139,250,0.6)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, CANNON_Y, 30, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (G.rapidLeft > 0) {
+    ctx.strokeStyle = 'rgba(251,191,36,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, CANNON_Y, 24, 0, Math.PI * 2); ctx.stroke();
+  }
+  // Barrel
+  ctx.fillStyle = '#1d4ed8';
+  ctx.beginPath();
+  ctx.rect(cx - 5, CANNON_Y - 28, 10, 20);
+  ctx.fill();
+  // Body
+  ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = 14;
+  ctx.fillStyle = '#3b82f6';
+  ctx.beginPath(); ctx.arc(cx, CANNON_Y, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  // Tip
+  ctx.fillStyle = '#93c5fd';
+  ctx.beginPath(); ctx.arc(cx, CANNON_Y - 28, 5, 0, Math.PI * 2); ctx.fill();
 
-      update() {
-        this.y -= this.speed;
-      }
-    }
+  // HP hearts (canvas overlay)
+  ctx.font = '16px sans-serif';
+  ctx.textAlign = 'left';
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = i < G.hp ? '#f87171' : '#2d2d2d';
+    ctx.fillText('♥', 8 + i * 22, 24);
+  }
 
-    // Explosion class
-    class Explosion {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.life = 1;
-        this.radius = 20;
-      }
+  // Score / wave
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('W' + G.wave + '  ' + G.score + 'pts', LW - 8, 24);
 
-      update() {
-        this.life -= 0.15;
-      }
+  // Wave progress bar
+  const wp = Math.min(G.waveKills / G.waveGoal, 1);
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(0, LH - 4, LW, 4);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillRect(0, LH - 4, LW * wp, 4);
 
-      draw() {
-        ctx.globalAlpha = this.life * 0.7;
-        ctx.fillStyle = '#f39c12';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * (1 - this.life), 0, Math.PI * 2);
-        ctx.fill();
+  // Particles
+  for (const p of G.particles) {
+    ctx.globalAlpha = Math.max(0, p.life / 30);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
 
-        ctx.strokeStyle = '#e67e22';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * (0.5 + this.life * 0.5), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    }
+// ── End / overlay ────────────────────────────────────────────
+function endGame() {
+  Scores.set(GAME_ID, G.score);
+  const rec  = Scores.get(GAME_ID);
+  const best = rec ? rec.score : G.score;
+  document.getElementById('score-display').textContent = 'Best: ' + best;
 
-    // Power-up class
-    class PowerUp {
-      constructor(x, y, type) {
-        this.x = x;
-        this.y = y;
-        this.type = type; // 'rapidFire' or 'shield'
-        this.size = 10;
-        this.speed = 1;
-      }
+  document.getElementById('card').innerHTML = `
+    <h2>Game Over!</h2>
+    <div class="big-num">${G.score}</div>
+    <p class="sub">Wave ${G.wave} · ${G.score} pts</p>
+    <p class="sub" style="color:#666">Best: ${best}</p>
+    <div class="btn-row">
+      <button class="btn" onclick="startGame()">Play Again</button>
+      <button class="btn btn-dark" onclick="location.href='/Airplane-Games/'">← Hub</button>
+    </div>`;
+  document.getElementById('overlay').classList.add('show');
+}
 
-      draw() {
-        const color = this.type === 'rapidFire' ? '#f39c12' : '#9b59b6';
-        ctx.fillStyle = color;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 10;
-        ctx.fillRect(this.x - this.size, this.y - this.size, this.size * 2, this.size * 2);
-        ctx.shadowBlur = 0;
-      }
+// ── Input ────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (!running || G.over) return;
+  if (e.code === 'ArrowLeft'  || e.code === 'KeyA') { G.lane = Math.max(0, G.lane - 1); e.preventDefault(); }
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') { G.lane = Math.min(NLANES - 1, G.lane + 1); e.preventDefault(); }
+});
 
-      update() {
-        this.y += this.speed;
-      }
-    }
+function tapLane(clientX) {
+  const r  = canvas.getBoundingClientRect();
+  const lx = (clientX - r.left) / scale;
+  G.lane = Math.max(0, Math.min(NLANES - 1, Math.floor(lx / LANE_W)));
+}
 
-    // Handle mouse/touch movement
-    document.addEventListener('mousemove', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      // Constrain cannon to lanes
-      const mouseX = e.clientX - rect.left;
-      const lane = Math.floor(mouseX / LANE_WIDTH);
-      gameState.cannonX = Math.max(0, Math.min(NUM_LANES - 1, lane)) * LANE_WIDTH + LANE_WIDTH / 2;
-    });
+wrap.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (!running || G.over) return;
+  tapLane(e.touches[0].clientX);
+}, { passive: false });
 
-    canvas.addEventListener('touchmove', (e) => {
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      const touchX = touch.clientX - rect.left;
-      const lane = Math.floor(touchX / LANE_WIDTH);
-      gameState.cannonX = Math.max(0, Math.min(NUM_LANES - 1, lane)) * LANE_WIDTH + LANE_WIDTH / 2;
-      e.preventDefault();
-    });
+wrap.addEventListener('click', e => {
+  if (!running || G.over) return;
+  tapLane(e.clientX);
+});
 
-    // Shoot on click
-    document.addEventListener('click', () => {
-      if (gameState.gameActive && gameState.shootCooldown <= 0) {
-        bullets.push(new Bullet(gameState.cannonX, canvas.height - CANNON_SIZE * 2 - 10));
-        gameState.shootCooldown = 200;
-      }
-    });
+document.getElementById('startBtn').addEventListener('click', startGame);
 
-    canvas.addEventListener('touchstart', () => {
-      if (gameState.gameActive && gameState.shootCooldown <= 0) {
-        bullets.push(new Bullet(gameState.cannonX, canvas.height - CANNON_SIZE * 2 - 10));
-        gameState.shootCooldown = 200;
-      }
-    });
+function startGame() {
+  document.getElementById('overlay').classList.remove('show');
+  newGame();
+  running = true;
+  if (rafId) cancelAnimationFrame(rafId);
+  loop();
+}
 
-    // Spawn enemies
-    let lastEnemySpawn = Date.now();
-    function spawnEnemies() {
-      const now = Date.now();
-      if (now - lastEnemySpawn > enemySpawnRate) {
-        const lane = Math.floor(Math.random() * NUM_LANES);
-        enemies.push(new Enemy(lane));
-        lastEnemySpawn = now;
-        enemySpawnRate = Math.max(600, 1500 - gameState.wave * 100);
-      }
-    }
+function loop() {
+  update();
+  draw();
+  rafId = requestAnimationFrame(loop);
+}
 
-    // Update wave
-    function updateWave() {
-      const elapsedSeconds = (Date.now() - waveStartTime) / 1000;
-      const newWave = Math.floor(elapsedSeconds / 15) + 1;
-      if (newWave > gameState.wave) {
-        gameState.wave = newWave;
-        if (typeof showToast !== 'undefined') {
-          showToast(`Wave ${gameState.wave}!`);
-        }
-      }
-    }
-
-    // Update game
-    function update() {
-      if (!gameState.gameActive) return;
-
-      gameState.shootCooldown--;
-
-      // Spawn enemies
-      spawnEnemies();
-      updateWave();
-
-      // Update enemies
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        enemies[i].update();
-
-        // Check if enemy passed bottom
-        if (enemies[i].y > canvas.height) {
-          gameState.health--;
-          explosions.push(new Explosion(enemies[i].x, canvas.height - CANNON_SIZE * 2));
-          enemies.splice(i, 1);
-
-          if (gameState.health <= 0) {
-            endGame();
-          }
-          continue;
-        }
-
-        // Check collision with bullets
-        for (let j = bullets.length - 1; j >= 0; j--) {
-          const bullet = bullets[j];
-          const dx = enemies[i].x - bullet.x;
-          const dy = enemies[i].y - bullet.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < enemies[i].size + bullet.size) {
-            gameState.score += 10;
-            explosions.push(new Explosion(enemies[i].x, enemies[i].y));
-            enemies.splice(i, 1);
-            bullets.splice(j, 1);
-
-            // Spawn power-up occasionally
-            if (Math.random() > 0.7) {
-              const type = Math.random() > 0.5 ? 'rapidFire' : 'shield';
-              powerUps.push(new PowerUp(enemies[i].x, enemies[i].y, type));
-            }
-            break;
-          }
-        }
-      }
-
-      // Update bullets
-      for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].update();
-        if (bullets[i].y < 0) {
-          bullets.splice(i, 1);
-        }
-      }
-
-      // Update explosions
-      for (let i = explosions.length - 1; i >= 0; i--) {
-        explosions[i].update();
-        if (explosions[i].life <= 0) {
-          explosions.splice(i, 1);
-        }
-      }
-
-      // Update power-ups
-      for (let i = powerUps.length - 1; i >= 0; i--) {
-        powerUps[i].update();
-
-        // Check collision with cannon
-        const dx = powerUps[i].x - gameState.cannonX;
-        const dy = powerUps[i].y - (canvas.height - CANNON_SIZE);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < 30) {
-          if (powerUps[i].type === 'rapidFire') {
-            gameState.shootCooldown = -500; // Rapid fire for a bit
-          }
-          powerUps.splice(i, 1);
-        } else if (powerUps[i].y > canvas.height) {
-          powerUps.splice(i, 1);
-        }
-      }
-
-      // Update UI
-      document.getElementById('score').textContent = gameState.score;
-      document.getElementById('wave').textContent = gameState.wave;
-    }
-
-    // Draw game
-    function draw() {
-      // Clear canvas
-      ctx.fillStyle = 'rgba(50, 100, 150, 0.15)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw lane dividers
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 2;
-      for (let i = 1; i < NUM_LANES; i++) {
-        const x = LANE_WIDTH * i;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-
-      // Draw enemies
-      enemies.forEach(enemy => enemy.draw());
-
-      // Draw bullets
-      bullets.forEach(bullet => bullet.draw());
-
-      // Draw explosions
-      explosions.forEach(explosion => explosion.draw());
-
-      // Draw power-ups
-      powerUps.forEach(powerUp => powerUp.draw());
-
-      // Draw cannon
-      ctx.fillStyle = '#3498db';
-      ctx.shadowColor = '#3498db';
-      ctx.shadowBlur = 15;
-      ctx.beginPath();
-      ctx.arc(gameState.cannonX, canvas.height - CANNON_SIZE, CANNON_SIZE, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // Draw cannon tip
-      ctx.strokeStyle = '#2980b9';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(gameState.cannonX, canvas.height - CANNON_SIZE);
-      ctx.lineTo(gameState.cannonX, canvas.height - CANNON_SIZE - 15);
-      ctx.stroke();
-
-      // Draw health
-      ctx.fillStyle = gameState.health > 1 ? '#2ecc71' : '#e74c3c';
-      ctx.font = 'bold 16px Inter, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(`Health: ${gameState.health}`, 10, 30);
-    }
-
-    function endGame() {
-      gameState.gameActive = false;
-      gameState.gameOver = true;
-      gameState.finalScore = gameState.score;
-      
-      saveScore(gameState.finalScore);
-      const bestScore = loadBestScore();
-
-      const overlay = document.getElementById('gameOverOverlay');
-      const message = document.getElementById('gameOverMessage');
-      const score = document.getElementById('finalScore');
-      const best = document.getElementById('bestScore');
-
-      message.textContent = `You survived ${gameState.wave} waves!`;
-      score.textContent = gameState.finalScore;
-      best.textContent = `Best: ${bestScore}`;
-      overlay.classList.add('active');
-    }
-
-    // Game loop
-    function gameLoop() {
-      update();
-      draw();
-      if (gameState.gameActive) {
-        requestAnimationFrame(gameLoop);
-      }
-    }
-
-    gameLoop();
-
-    // Handle window resize
-    window.addEventListener('resize', () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight - 70;
-    });
-  </script>
+const _rec = Scores.get(GAME_ID);
+document.getElementById('score-display').textContent = 'Best: ' + (_rec ? _rec.score : 0);
+</script>
 </body>
 </html>
