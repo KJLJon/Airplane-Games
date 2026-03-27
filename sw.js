@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'airplane-games-v1';
+const CACHE_VERSION = 'airplane-games-v2';
 
 const PRECACHE_URLS = [
   '/Airplane-Games/',
@@ -28,6 +28,9 @@ const PRECACHE_URLS = [
   '/Airplane-Games/games/stratego/index.html',
   '/Airplane-Games/games/nonogram/index.html',
   '/Airplane-Games/games/flapper/index.html',
+  '/Airplane-Games/games/simon/index.html',
+  '/Airplane-Games/games/multiplier-runner/index.html',
+  '/Airplane-Games/games/lane-shooter/index.html',
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html>
@@ -91,6 +94,13 @@ const OFFLINE_HTML = `<!DOCTYPE html>
   </div>
 </body>
 </html>`;
+
+// ── Force-update: allow page to skip the waiting SW ──────────────────────────
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // ── Install: pre-cache all known assets ──────────────────────────────────────
 self.addEventListener('install', event => {

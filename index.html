@@ -366,12 +366,41 @@
       document.getElementById('install-btn').style.display = 'none';
     });
 
-    /* ── Service Worker registration ──────────────────────── */
+    /* ── Service Worker registration + update banner ──────── */
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/Airplane-Games/sw.js', { scope: '/Airplane-Games/' })
-        .then(reg => console.log('[SW] registered, scope:', reg.scope))
+        .then(reg => {
+          console.log('[SW] registered, scope:', reg.scope);
+          function trackWorker(worker) {
+            worker.addEventListener('statechange', () => {
+              if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                showSWUpdateBanner(reg);
+              }
+            });
+          }
+          if (reg.installing) trackWorker(reg.installing);
+          reg.addEventListener('updatefound', () => trackWorker(reg.installing));
+          if (reg.waiting && navigator.serviceWorker.controller) showSWUpdateBanner(reg);
+        })
         .catch(err => console.warn('[SW] registration failed:', err));
+      let _hubRefreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!_hubRefreshing) { _hubRefreshing = true; window.location.reload(); }
+      });
+    }
+
+    function showSWUpdateBanner(reg) {
+      if (document.getElementById('ag-update-banner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'ag-update-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#1e293b;color:#f0f0f5;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:99999;border-bottom:2px solid #7c6af7;font-size:14px;';
+      banner.innerHTML = '<span>New version available!</span><button id="ag-update-btn" style="background:#7c6af7;color:#fff;border:none;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px;font-weight:600">Update Now</button>';
+      document.body.prepend(banner);
+      document.getElementById('ag-update-btn').addEventListener('click', () => {
+        const w = reg.waiting;
+        if (w) w.postMessage({ type: 'SKIP_WAITING' });
+      });
     }
 
     /* ── Game catalogue ───────────────────────────────────── */
