@@ -37,7 +37,7 @@
     #touch-left  { left:0; }
     #touch-right { right:0; }
     #fire-btn {
-      position:absolute; bottom:24px; right:24px;
+      position:absolute; bottom:max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px)); right:24px;
       width:70px; height:70px; border-radius:50%;
       background:rgba(231,76,60,0.4); border:2px solid #e74c3c;
       color:#e74c3c; font-size:1.4rem; font-family:'Outfit',sans-serif;
@@ -46,7 +46,7 @@
       user-select:none; -webkit-tap-highlight-color:transparent;
     }
     #thrust-btn {
-      position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
+      position:absolute; bottom:max(24px, calc(env(safe-area-inset-bottom, 0px) + 8px)); left:50%; transform:translateX(-50%);
       width:70px; height:70px; border-radius:50%;
       background:rgba(124,106,247,0.3); border:2px solid #7c6af7;
       color:#7c6af7; font-size:0.85rem; font-family:'Outfit',sans-serif;

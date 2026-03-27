@@ -15,9 +15,9 @@
     #canvas { display:block; flex:1; touch-action:none; cursor:pointer; }
     #ui-overlay { position:fixed; top:0; left:0; right:0; bottom:0; pointer-events:none; z-index:5; }
     .score-overlay { position:fixed; top:60px; left:50%; transform:translateX(-50%); font-family:'Outfit',sans-serif; font-size:2rem; font-weight:700; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.8); pointer-events:none; z-index:6; }
-    .boost-bar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); width:120px; height:8px; background:rgba(255,255,255,0.2); border-radius:4px; pointer-events:none; z-index:6; overflow:hidden; }
+    .boost-bar { position:fixed; bottom:max(20px, calc(env(safe-area-inset-bottom, 0px) + 8px)); left:50%; transform:translateX(-50%); width:120px; height:8px; background:rgba(255,255,255,0.2); border-radius:4px; pointer-events:none; z-index:6; overflow:hidden; }
     .boost-fill { height:100%; background:linear-gradient(90deg,#7c6af7,#f7a94a); border-radius:4px; transition:width 0.1s; }
-    .boost-label { position:fixed; bottom:32px; left:50%; transform:translateX(-50%); font-size:0.75rem; color:rgba(255,255,255,0.6); pointer-events:none; z-index:6; }
+    .boost-label { position:fixed; bottom:max(32px, calc(env(safe-area-inset-bottom, 0px) + 20px)); left:50%; transform:translateX(-50%); font-size:0.75rem; color:rgba(255,255,255,0.6); pointer-events:none; z-index:6; }
     #start-screen, #gameover-screen { position:fixed; inset:0; background:rgba(10,22,40,0.9); z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; }
     #start-screen h2, #gameover-screen h2 { font-family:'Outfit',sans-serif; font-size:2rem; color:#fff; margin:0; text-align:center; }
     #start-screen p, #gameover-screen p { color:rgba(255,255,255,0.6); text-align:center; margin:0; font-size:0.9rem; }
@@ -293,11 +293,14 @@
       drawJet();
     }
 
-    function loop() {
+    let _lastTs = 0;
+    function loop(ts) {
       if (gameState !== 'playing') return;
+      animId = requestAnimationFrame(loop);
+      if (ts - _lastTs < 14) return; // cap at ~60fps
+      _lastTs = ts;
       update();
       draw();
-      animId = requestAnimationFrame(loop);
     }
 
     function startGame(m, seed) {
@@ -308,7 +311,8 @@
       gameState = 'playing';
       resize();
       initGame(seed);
-      loop();
+      _lastTs = 0;
+      animId = requestAnimationFrame(loop);
     }
 
     document.getElementById('playBtn').addEventListener('click', () => {
@@ -322,6 +326,7 @@
       startGame('daily', s);
     });
     document.getElementById('restartBtn').addEventListener('click', () => {
+      document.getElementById('gameover-screen').style.display = 'none';
       document.getElementById('ss-best').textContent = best+'m';
       document.getElementById('ss-daily').textContent = dailyBest+'m';
       document.getElementById('start-screen').style.display = 'flex';
@@ -343,8 +348,6 @@
 
     window.addEventListener('resize', resize);
     resize();
-    // Initial draw
-    draw();
   </script>
 </body>
 </html>
