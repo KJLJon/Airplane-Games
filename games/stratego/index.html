@@ -29,9 +29,14 @@
       background:#1a1a28;
       border-radius:10px;
       border:2px solid rgba(255,255,255,0.1);
+      /* Responsive: shrinks to fit on narrow screens */
+      width: min(336px, calc(100dvw - 44px));
+      box-sizing: border-box;
     }
     .cell {
-      width:42px; height:42px; border-radius:5px;
+      aspect-ratio: 1;
+      min-width: 0;
+      border-radius:5px;
       background:#0f0f1c;
       border:1px solid rgba(255,255,255,0.06);
       display:flex; align-items:center; justify-content:center;
@@ -45,7 +50,7 @@
     .cell.valid-move:hover { background:#0f2015; }
     /* Pieces */
     .piece {
-      width:36px; height:36px; border-radius:4px;
+      width:86%; height:86%; border-radius:4px;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       font-size:9px; font-weight:700; font-family:'Outfit',sans-serif;
       line-height:1.1; text-align:center; pointer-events:none;
@@ -59,15 +64,19 @@
     .piece .name  { font-size:7.5px; opacity:0.85; }
     /* Bottom setup bar */
     #setup-bar {
-      position:absolute; bottom:0; left:0; right:0;
+      flex-shrink:0;
       background:rgba(16,16,24,0.97); border-top:1px solid rgba(255,255,255,0.1);
       padding:8px; z-index:20;
     }
     #piece-tray {
-      display:flex; gap:4px; flex-wrap:wrap; justify-content:center; margin-bottom:6px;
+      display:flex; gap:4px; flex-wrap:nowrap;
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+      justify-content:flex-start; margin-bottom:6px;
+      padding-bottom:4px; scrollbar-width:none;
     }
+    #piece-tray::-webkit-scrollbar { display:none; }
     .tray-piece {
-      width:38px; height:38px; border-radius:4px;
+      width:36px; height:36px; border-radius:4px; flex-shrink:0;
       background:#1a3a6a; border:2px solid #4a7aff; color:#a0c4ff;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       cursor:pointer; font-size:8px; font-weight:700; font-family:'Outfit',sans-serif;
