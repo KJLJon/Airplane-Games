@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Turbo Tunnels Rally – Airplane Games</title>
+  <base href="/Airplane-Games/">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="games/turbo-tunnels/style.css">
+  <script src="js/shared.js" defer></script>
+</head>
+<body>
+
+<!-- ── Canvas ───────────────────────────────────────────────── -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- ── Zone badge ───────────────────────────────────────────── -->
+<div id="zoneBadge"></div>
+
+<!-- ── HUD ──────────────────────────────────────────────────── -->
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div class="hud-dist"    id="hudDist">0m</div>
+    <div class="hud-coins"   id="hudCoins">🪙 0</div>
+    <div class="hud-vehicle" id="hudVehicle">Starter Buggy</div>
+  </div>
+  <div class="hud-right">
+    <button class="hud-icon-btn" id="muteBtn"  aria-label="Mute">🔊</button>
+    <button class="hud-icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+  </div>
+</div>
+
+<!-- ── Gauge bars ────────────────────────────────────────────── -->
+<div id="gaugeWrap" class="hidden">
+  <div class="gauge-row">
+    <div class="gauge-label">🌡️ Heat</div>
+    <div class="gauge-track"><div id="heatFill" class="gauge-fill" style="width:0%"></div></div>
+  </div>
+  <div class="gauge-row">
+    <div class="gauge-label">⛽ Fuel</div>
+    <div class="gauge-track"><div id="fuelFill" class="gauge-fill" style="width:100%"></div></div>
+  </div>
+</div>
+
+<!-- ── Start Screen ──────────────────────────────────────────── -->
+<div id="startScreen" class="screen">
+  <div class="game-title">Turbo Tunnels<br>Rally</div>
+  <div class="game-subtitle">Accelerate · Survive · Go Deeper</div>
+  <div class="stats-row">
+    <div class="stat-pill"><strong id="bestDist">0m</strong>Best</div>
+    <div class="stat-pill"><strong id="totalCoins" class="coin-c">0</strong>Coins</div>
+    <div class="stat-pill"><strong id="totalBlueprints" class="bp-c">0</strong>Blueprints</div>
+  </div>
+  <button class="btn btn-primary"   id="playBtn">▶&nbsp; Play</button>
+  <button class="btn btn-vehicle"   id="vehicleBtn">🚗&nbsp; Vehicles</button>
+  <button class="btn btn-secondary" id="shopBtn">🔧&nbsp; Upgrades</button>
+  <button class="btn btn-secondary" id="settingsBtn">⚙&nbsp; Settings</button>
+  <a href="../../" class="btn btn-secondary">🏠&nbsp; Back to Hub</a>
+</div>
+
+<!-- ── Vehicle Select ────────────────────────────────────────── -->
+<div id="vehicleScreen" class="screen hidden">
+  <div class="section-title">🚗 Select Vehicle</div>
+  <div class="vehicle-selected-label" id="vehicleSelectedLabel">Selected: Starter Buggy</div>
+  <div class="vehicle-grid" id="vehicleGrid"></div>
+  <button class="btn btn-secondary" id="vehicleBackBtn" style="margin-top:14px;max-width:180px">← Back</button>
+</div>
+
+<!-- ── Pause Screen ───────────────────────────────────────────── -->
+<div id="pauseScreen" class="screen hidden">
+  <div class="section-title">⏸ Paused</div>
+  <button class="btn btn-primary"   id="resumeBtn">▶ Resume</button>
+  <button class="btn btn-secondary" id="pauseRestartBtn">↺ Restart</button>
+  <button class="btn btn-secondary" id="pauseMenuBtn">🏠 Menu</button>
+</div>
+
+<!-- ── Game Over Screen ───────────────────────────────────────── -->
+<div id="gameoverScreen" class="screen hidden">
+  <div class="section-title">💥 Wrecked!</div>
+  <div id="newRecordBadge" class="new-record hidden">🏆 NEW RECORD!</div>
+  <div class="go-dist" id="goDist">0m</div>
+  <div class="go-sub"  id="goSub">Best: 0m</div>
+  <div class="go-stats">
+    <div class="go-stat"><div class="go-stat-v" id="goCoins">0</div><div class="go-stat-l">🪙 Coins</div></div>
+    <div class="go-stat"><div class="go-stat-v" id="goFuel">0</div><div class="go-stat-l">⛽ Fuel Cells</div></div>
+    <div class="go-stat"><div class="go-stat-v" id="goBlueprints">0</div><div class="go-stat-l">📐 Blueprints</div></div>
+    <div class="go-stat"><div class="go-stat-v" id="goCrashReason">-</div><div class="go-stat-l">Cause</div></div>
+  </div>
+  <button class="btn btn-primary"   id="playAgainBtn">▶ Play Again</button>
+  <button class="btn btn-secondary" id="goShopBtn">🔧 Upgrades</button>
+  <button class="btn btn-secondary" id="goMenuBtn">🏠 Menu</button>
+</div>
+
+<!-- ── Upgrade Shop ───────────────────────────────────────────── -->
+<div id="shopScreen" class="screen hidden">
+  <div class="shop-header">
+    <div class="section-title" style="margin:0">🔧 Upgrades</div>
+    <div class="shop-currency">
+      <div class="currency-pill">🪙 <span id="shopCoins">0</span></div>
+      <div class="currency-pill">📐 <span id="shopBlueprints" class="bp-c">0</span></div>
+    </div>
+  </div>
+  <div class="upgrade-list" id="upgradeList"></div>
+  <button class="btn btn-secondary" id="shopBackBtn" style="margin-top:12px;max-width:180px">← Back</button>
+</div>
+
+<!-- ── Settings Screen ────────────────────────────────────────── -->
+<div id="settingsScreen" class="screen hidden">
+  <div class="section-title">⚙ Settings</div>
+  <div class="scroll-wrap">
+    <div class="settings-group">
+      <label class="settings-label">🎵 Music Volume</label>
+      <input type="range" class="slider" id="musicVol" min="0" max="100" value="35">
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">🔔 SFX Volume</label>
+      <input type="range" class="slider" id="sfxVol" min="0" max="100" value="70">
+    </div>
+  </div>
+  <button class="btn btn-secondary" id="settingsBackBtn" style="margin-top:14px">← Back</button>
+</div>
+
+<!-- ── Load engine + UI scripts ───────────────────────────────── -->
+<script src="games/turbo-tunnels/engine/storage.js"></script>
+<script src="games/turbo-tunnels/engine/audio.js"></script>
+<script src="games/turbo-tunnels/engine/upgrades.js"></script>
+<script src="games/turbo-tunnels/engine/zones.js"></script>
+<script src="games/turbo-tunnels/engine/tunnels.js"></script>
+<script src="games/turbo-tunnels/engine/vehicle.js"></script>
+<script src="games/turbo-tunnels/engine/physics.js"></script>
+<script src="games/turbo-tunnels/ui/hud.js"></script>
+<script src="games/turbo-tunnels/ui/menu.js"></script>
+<script src="games/turbo-tunnels/ui/shop.js"></script>
+<script src="games/turbo-tunnels/ui/vehicleSelect.js"></script>
+<script src="games/turbo-tunnels/game.js"></script>
+</body>
+</html>
