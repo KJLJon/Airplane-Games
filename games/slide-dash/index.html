@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Slide Dash – Airplane Games</title>
+  <base href="/Airplane-Games/">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="js/shared.js" defer></script>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #05061a; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #fff; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+    /* ── Canvas ───────────────────────────────────────────── */
+    #gameCanvas { display: block; width: 100%; height: 100dvh; position: fixed; top: 0; left: 0; }
+
+    /* ── Screen overlays ──────────────────────────────────── */
+    .screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 28px 24px;
+      background: rgba(5, 6, 26, 0.93);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .screen.hidden { display: none; }
+
+    /* ── Typography ───────────────────────────────────────── */
+    .game-title {
+      font-size: clamp(2.2rem, 8vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: -2px;
+      background: linear-gradient(135deg, #00e5ff 0%, #00bcd4 50%, #0097a7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .game-subtitle { color: #80deea; font-size: 0.95rem; margin-bottom: 28px; text-align: center; }
+    .section-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 20px; }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .btn {
+      display: block; width: 100%; max-width: 300px;
+      padding: 15px 24px; margin: 7px 0;
+      border: none; border-radius: 16px;
+      font-size: 1.05rem; font-weight: 700;
+      cursor: pointer; text-align: center; text-decoration: none;
+      transition: transform 0.1s, box-shadow 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary {
+      background: linear-gradient(135deg, #00bcd4, #0097a7);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(0,188,212,0.35);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+
+    /* ── Best score on start ──────────────────────────────── */
+    .best-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px;
+      padding: 8px 18px;
+      margin-bottom: 24px;
+      font-size: 0.9rem; color: #80deea;
+    }
+    .best-badge strong { color: #00e5ff; font-size: 1.1rem; }
+
+    /* ── HUD ──────────────────────────────────────────────── */
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 14px 16px;
+      pointer-events: none;
+    }
+    #hud.hidden { display: none; }
+    .hud-left { display: flex; flex-direction: column; gap: 2px; }
+    .hud-score {
+      font-size: 1.6rem; font-weight: 900; color: #fff;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.9);
+      line-height: 1;
+    }
+    .hud-dist { font-size: 0.8rem; color: #80deea; }
+    #muteBtn {
+      pointer-events: auto;
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; border-radius: 50%;
+      width: 42px; height: 42px;
+      font-size: 1.1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Game Over ────────────────────────────────────────── */
+    .gameover-title { font-size: 2rem; font-weight: 900; margin-bottom: 8px; }
+    .final-score { font-size: 3rem; font-weight: 900; color: #00e5ff; margin: 12px 0; }
+    .new-record {
+      background: linear-gradient(135deg, #ffd700, #ff9800);
+      color: #000; padding: 5px 18px;
+      border-radius: 20px; font-weight: 900;
+      font-size: 0.85rem; margin-bottom: 10px;
+      display: inline-block;
+    }
+    .breakdown {
+      background: rgba(255,255,255,0.05);
+      border-radius: 14px; padding: 14px 18px;
+      width: 100%; max-width: 300px; margin: 10px 0;
+    }
+    .breakdown-row {
+      display: flex; justify-content: space-between;
+      padding: 4px 0; font-size: 0.88rem; color: #80deea;
+    }
+    .breakdown-row strong { color: #fff; }
+    .breakdown-total {
+      border-top: 1px solid rgba(255,255,255,0.15);
+      margin-top: 8px; padding-top: 8px;
+      font-weight: 700; font-size: 1rem; color: #fff;
+    }
+
+    /* ── Settings ─────────────────────────────────────────── */
+    .settings-group { width: 100%; max-width: 320px; margin-bottom: 18px; }
+    .settings-label { color: #80deea; font-size: 0.82rem; margin-bottom: 8px; display: block; }
+    .slider { width: 100%; height: 6px; accent-color: #00bcd4; cursor: pointer; }
+
+    /* ── Trail selector ───────────────────────────────────── */
+    .trail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 320px; }
+    .trail-card {
+      padding: 12px 10px; border-radius: 14px;
+      background: rgba(255,255,255,0.07);
+      border: 2px solid transparent;
+      cursor: pointer; text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .trail-card:active { transform: scale(0.97); }
+    .trail-card.selected { border-color: #00bcd4; background: rgba(0,188,212,0.12); }
+    .trail-card.locked { opacity: 0.4; cursor: default; }
+    .trail-name { font-weight: 700; font-size: 0.88rem; margin-bottom: 3px; }
+    .trail-req { font-size: 0.72rem; color: #80deea; }
+
+    /* ── Scores screen ────────────────────────────────────── */
+    .score-card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px; padding: 22px;
+      width: 100%; max-width: 300px;
+      text-align: center;
+    }
+    .score-card-val { font-size: 2.8rem; font-weight: 900; color: #00e5ff; }
+    .score-card-label { color: #80deea; font-size: 0.82rem; margin-top: 6px; }
+
+    /* ── Bonus pop ────────────────────────────────────────── */
+    .bonus-pop {
+      position: fixed; top: 45%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.3rem; font-weight: 900;
+      color: #ffeb3b;
+      text-shadow: 0 0 20px rgba(255,152,0,0.8);
+      pointer-events: none;
+      animation: bonusFly 0.9s ease-out forwards;
+      z-index: 30; white-space: nowrap;
+    }
+    @keyframes bonusFly {
+      0%   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -130%) scale(1.3); }
+    }
+
+    /* ── Scroll container for settings ───────────────────── */
+    .scroll-wrap {
+      overflow-y: auto; max-height: 65vh;
+      width: 100%; display: flex; flex-direction: column; align-items: center;
+      -webkit-overflow-scrolling: touch;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Game canvas ──────────────────────────────────────── -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- ── HUD (shown during play) ─────────────────────────── -->
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div class="hud-score" id="hudScore">0</div>
+    <div class="hud-dist" id="hudDist">0m</div>
+  </div>
+  <button id="muteBtn" aria-label="Toggle mute">🔊</button>
+</div>
+
+<!-- ── Start screen ─────────────────────────────────────── -->
+<div id="startScreen" class="screen">
+  <div class="game-title">Slide Dash</div>
+  <div class="game-subtitle">Endless downhill rush — dodge, boost, fly!</div>
+  <div class="best-badge">🏆 Best: <strong id="startBest">—</strong></div>
+  <button class="btn btn-primary" id="playBtn">▶&nbsp; Play</button>
+  <button class="btn btn-secondary" id="scoresBtn">🏆&nbsp; High Scores</button>
+  <button class="btn btn-secondary" id="settingsBtn">⚙&nbsp; Settings</button>
+  <a href="../../" class="btn btn-secondary">🏠&nbsp; Back to Hub</a>
+</div>
+
+<!-- ── Game Over screen ─────────────────────────────────── -->
+<div id="gameoverScreen" class="screen hidden">
+  <div class="gameover-title">Game Over</div>
+  <div id="newRecordBadge" class="new-record hidden">🏆 NEW RECORD!</div>
+  <div class="final-score" id="finalScore">0</div>
+  <div class="breakdown" id="scoreBreakdown"></div>
+  <button class="btn btn-primary" id="playAgainBtn">▶&nbsp; Play Again</button>
+  <button class="btn btn-secondary" id="menuBtn">🏠&nbsp; Menu</button>
+</div>
+
+<!-- ── Settings screen ──────────────────────────────────── -->
+<div id="settingsScreen" class="screen hidden">
+  <div class="section-title">⚙ Settings</div>
+  <div class="scroll-wrap">
+    <div class="settings-group">
+      <label class="settings-label">🎵 Music Volume</label>
+      <input type="range" class="slider" id="musicVol" min="0" max="100" value="40">
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">🔔 SFX Volume</label>
+      <input type="range" class="slider" id="sfxVol" min="0" max="100" value="70">
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">✨ Trail Style</label>
+      <div class="trail-grid" id="trailGrid"></div>
+    </div>
+  </div>
+  <button class="btn btn-secondary" id="settingsBackBtn" style="margin-top:16px">← Back</button>
+</div>
+
+<!-- ── High Scores screen ───────────────────────────────── -->
+<div id="scoresScreen" class="screen hidden">
+  <div class="section-title">🏆 High Scores</div>
+  <div id="scoresList" style="width:100%;max-width:320px"></div>
+  <button class="btn btn-secondary" id="scoresBackBtn" style="margin-top:24px">← Back</button>
+</div>
+
+<!-- ── Game script (phases 2-5 appended below) ──────────── -->
+<script>
+/* =============================================================
+   SLIDE DASH — Main game script
+   Sections: Constants → Audio → Trails → Track → Player →
+             Bots → Obstacles → Particles → Render → GameLoop →
+             Screens → Init
+   ============================================================= */
+
+// ── Canvas setup ──────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ── Constants ─────────────────────────────────────────────
+const C = {
+  TRACK_W_START : 300,   // initial track width px
+  TRACK_W_MIN   : 160,   // narrowest track at full difficulty
+  SEG_H         : 75,    // world-unit height of each track segment
+  PLAYER_R      : 14,    // player circle radius
+  BOT_R         : 12,    // bot circle radius
+  BOT_COUNT     : 3,
+  GRAVITY       : 0.45,  // air gravity per frame
+  PLAYER_Y_FRAC : 0.62,  // player fixed screen-Y fraction from top
+  TRAIL_LEN     : 28,    // history points for trail
+  BASE_SPEED    : 4,     // starting scroll speed px/frame
+  MAX_SPEED     : 14,    // max scroll speed
+  SPEED_INC     : 0.0007,// speed growth per frame
+};
+
+// ── Audio system ──────────────────────────────────────────
+let audioCtx = null, musicGain = null, sfxGain = null;
+let musicTimers = [];
+let isMuted = false;
+let musicVol = 0.4, sfxVol = 0.7;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  musicGain = audioCtx.createGain(); musicGain.gain.value = musicVol; musicGain.connect(audioCtx.destination);
+  sfxGain   = audioCtx.createGain(); sfxGain.gain.value   = sfxVol;   sfxGain.connect(audioCtx.destination);
+}
+function ensureAudio() {
+  initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function toggleMute() {
+  isMuted = !isMuted;
+  if (audioCtx) { musicGain.gain.value = isMuted ? 0 : musicVol; sfxGain.gain.value = isMuted ? 0 : sfxVol; }
+  document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+}
+function setMusicVol(v) { musicVol = v/100; if (audioCtx && !isMuted) musicGain.gain.value = musicVol; }
+function setSfxVol(v)   { sfxVol   = v/100; if (audioCtx && !isMuted) sfxGain.gain.value   = sfxVol;   }
+
+// Background music: looping arpeggiated sequence using oscillators
+function startMusic() {
+  if (!audioCtx) return;
+  stopMusic();
+  // C major pentatonic chord tones (two octaves)
+  const notes = [130.81, 164.81, 196.00, 261.63, 196.00, 164.81, 130.81, 174.61];
+  let i = 0;
+  function scheduleNote() {
+    if (!audioCtx) return;
+    const freq = notes[i++ % notes.length];
+    const osc  = audioCtx.createOscillator();
+    const env  = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = freq;
+    const t = audioCtx.currentTime;
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.18, t + 0.05);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    osc.connect(env); env.connect(musicGain);
+    osc.start(t); osc.stop(t + 0.5);
+    musicTimers.push(setTimeout(scheduleNote, 280));
+  }
+  scheduleNote();
+}
+function stopMusic() { musicTimers.forEach(clearTimeout); musicTimers = []; }
+
+// SFX helpers — all procedural via Web Audio
+function sfxPlay(fn) { if (!audioCtx) return; try { fn(); } catch(_) {} }
+
+function sfxJump() {
+  sfxPlay(() => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; const t = audioCtx.currentTime;
+    o.frequency.setValueAtTime(280, t); o.frequency.exponentialRampToValueAtTime(560, t+0.18);
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.22);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.22);
+  });
+}
+function sfxLand() {
+  sfxPlay(() => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sawtooth'; const t = audioCtx.currentTime;
+    o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(55, t+0.12);
+    g.gain.setValueAtTime(0.45, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.14);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.14);
+  });
+}
+function sfxBoost() {
+  sfxPlay(() => {
+    [300,420,560,720].forEach((f,i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      const t = audioCtx.currentTime + i*0.07;
+      o.type = 'square'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.1);
+      o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.11);
+    });
+  });
+}
+function sfxBump() {
+  sfxPlay(() => {
+    const sr = audioCtx.sampleRate, len = sr*0.1;
+    const buf = audioCtx.createBuffer(1, len, sr);
+    const d   = buf.getChannelData(0);
+    for (let k=0; k<len; k++) d[k] = (Math.random()*2-1) * Math.pow(1-k/len, 1.5);
+    const s = audioCtx.createBufferSource(), g = audioCtx.createGain();
+    s.buffer = buf; g.gain.value = 0.55;
+    s.connect(g); g.connect(sfxGain); s.start();
+  });
+}
+function sfxNearMiss() {
+  sfxPlay(() => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; const t = audioCtx.currentTime;
+    o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(220, t+0.22);
+    g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.25);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.25);
+  });
+}
+
+// ── Trail cosmetics ────────────────────────────────────────
+// Each trail has: id, name, unlockAt (distance metres), drawFn(ctx, x, y, age)
+const TRAILS = [
+  {
+    id: 'classic', name: 'Classic', unlockAt: 0,
+    draw(c, x, y, age) {
+      c.globalAlpha = Math.max(0, 0.65 - age * 0.024);
+      c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(x, y, Math.max(1, 4.5 - age*0.1), 0, Math.PI*2); c.fill();
+    }
+  },
+  {
+    id: 'fire', name: '🔥 Fire', unlockAt: 500,
+    draw(c, x, y, age) {
+      c.globalAlpha = Math.max(0, 0.8 - age*0.028);
+      c.fillStyle = `hsl(${Math.max(0,30 - age*2)},100%,${Math.max(30,62-age*1.2)}%)`;
+      c.beginPath(); c.arc(x, y, Math.max(1, 5.5 - age*0.13), 0, Math.PI*2); c.fill();
+    }
+  },
+  {
+    id: 'rainbow', name: '🌈 Rainbow', unlockAt: 1000,
+    draw(c, x, y, age) {
+      c.globalAlpha = Math.max(0, 0.75 - age*0.026);
+      c.fillStyle = `hsl(${(age*14) % 360},100%,60%)`;
+      c.beginPath(); c.arc(x, y, 4.5, 0, Math.PI*2); c.fill();
+    }
+  },
+  {
+    id: 'ice', name: '❄️ Ice', unlockAt: 2000,
+    draw(c, x, y, age) {
+      c.globalAlpha = Math.max(0, 0.55 - age*0.018);
+      c.fillStyle = '#80deea';
+      c.beginPath(); c.arc(x, y, Math.max(1, 3.5 + Math.sin(age*0.8)*1.2), 0, Math.PI*2); c.fill();
+      if (age % 4 === 0) {
+        c.globalAlpha = 0.45;
+        c.fillStyle = '#e0f7fa';
+        c.beginPath(); c.arc(x + (Math.random()*7-3.5), y + (Math.random()*7-3.5), 1.4, 0, Math.PI*2); c.fill();
+      }
+    }
+  },
+];
+
+let unlockedTrails = ['classic'];
+let selectedTrail  = 'classic';
+
+function loadTrails() {
+  try {
+    const d = JSON.parse(localStorage.getItem('ag_slide_dash_trails') || '{}');
+    unlockedTrails = d.unlocked || ['classic'];
+    selectedTrail  = d.selected || 'classic';
+  } catch(_) {}
+}
+function saveTrails() {
+  try { localStorage.setItem('ag_slide_dash_trails', JSON.stringify({ unlocked: unlockedTrails, selected: selectedTrail })); } catch(_) {}
+}
+function checkUnlocks(dist) {
+  TRAILS.forEach(t => {
+    if (dist >= t.unlockAt && !unlockedTrails.includes(t.id)) {
+      unlockedTrails.push(t.id);
+      saveTrails();
+      showBonusPop(`🎉 Trail Unlocked: ${t.name}!`);
+    }
+  });
+}
+
+// ── Game state ─────────────────────────────────────────────
+let gameActive = false;
+let frameCount = 0;
+let scrollSpeed = C.BASE_SPEED;
+let distance = 0, score = 0;
+let bonusNM = 0, bonusOT = 0, bonusAT = 0;  // near-miss, overtake, airtime totals
+let animId = null;
+
+// ── Track ──────────────────────────────────────────────────
+// Each segment: { worldY, cx, width, obstacle }
+// obstacle: null | { type, ...props }
+let segments   = [];
+let genWorldY  = 0;   // next worldY to generate
+let trkCx      = 0;   // current track centre offset from canvas centre
+let trkTarget  = 0;   // target centre offset
+let trkTimer   = 0;   // frames until next direction change
+
+function genSegment(wy) {
+  // Steer track centre smoothly left/right
+  trkTimer--;
+  if (trkTimer <= 0) {
+    trkTimer  = 8 + Math.floor(Math.random() * 14);
+    const amp = Math.min(110, distance / 25);
+    trkTarget = (Math.random() - 0.5) * 2 * amp;
+  }
+  trkCx += (trkTarget - trkCx) * 0.06;
+
+  // Track narrows with distance
+  const diff  = Math.min(1, distance / 3000);
+  const width = C.TRACK_W_START - (C.TRACK_W_START - C.TRACK_W_MIN) * diff;
+  const cx    = canvas.width / 2 + trkCx;
+
+  // Obstacle chance rises with difficulty
+  let obstacle = null;
+  if (Math.random() < 0.11 + diff * 0.16) {
+    const pool = ['bumper', 'mover', 'boost', 'ramp'];
+    if (diff > 0.25) pool.push('gap');
+    const type = pool[Math.floor(Math.random() * pool.length)];
+    obstacle = { type, used: false, nearMissTriggered: false };
+    if (type === 'bumper') obstacle.relX = (Math.random() - 0.5) * width * 0.5;
+    if (type === 'mover')  { obstacle.phase = Math.random()*Math.PI*2; obstacle.spd = 1 + Math.random()*2; }
+  }
+  return { worldY: wy, cx, width, obstacle };
+}
+
+function buildTrackAhead() {
+  const visEnd = player.worldY + canvas.height + C.SEG_H * 5;
+  while (genWorldY < visEnd) {
+    segments.push(genSegment(genWorldY));
+    genWorldY += C.SEG_H;
+  }
+  // Cull segments far above camera
+  const cut = player.worldY - canvas.height * 1.2;
+  while (segments.length && segments[0].worldY < cut) segments.shift();
+}
+
+function segAt(worldY) {
+  // Find segment whose worldY <= worldY < worldY+SEG_H
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (segments[i].worldY <= worldY) return segments[i];
+  }
+  return segments[0] || null;
+}
+
+// World → screen Y conversion (player is fixed at player.screenY)
+function w2s(wy) { return player.screenY - (player.worldY - wy); }
+
+// ── Player ─────────────────────────────────────────────────
+const player = {
+  x: 0, screenY: 0, worldY: 0,
+  vx: 0,
+  airborne: false, airH: 0, airVy: 0, airFrames: 0,
+  trail: [],   // [{x,y}]
+};
+
+function resetPlayer() {
+  player.x        = canvas.width / 2;
+  player.screenY  = canvas.height * C.PLAYER_Y_FRAC;
+  player.worldY   = canvas.height * 0.5;
+  player.vx       = 0;
+  player.airborne = false; player.airH = 0; player.airVy = 0; player.airFrames = 0;
+  player.trail    = [];
+}
+
+function updatePlayer() {
+  // Advance world position (player slides down)
+  player.worldY += scrollSpeed;
+
+  // Lateral steering
+  const dir = steerDir();
+  const force = 0.55 + scrollSpeed * 0.04;
+  player.vx += dir * force;
+  player.vx *= 0.80;  // friction
+  player.x  += player.vx;
+
+  // Clamp to track edges
+  const seg = segAt(player.worldY);
+  if (seg) {
+    const hw = seg.width / 2 - C.PLAYER_R;
+    if (player.x < seg.cx - hw) { player.x = seg.cx - hw; player.vx =  Math.abs(player.vx) * 0.25; }
+    if (player.x > seg.cx + hw) { player.x = seg.cx + hw; player.vx = -Math.abs(player.vx) * 0.25; }
+  }
+
+  // Air arc physics
+  if (player.airborne) {
+    player.airH   += player.airVy;
+    player.airVy  += C.GRAVITY;
+    player.airFrames++;
+    if (player.airH >= 0) {
+      player.airborne = false; player.airH = 0; player.airVy = 0;
+      sfxLand();
+      const secs = player.airFrames / 60;
+      if (secs > 0.4) {
+        const bonus = Math.floor(secs * 12);
+        bonusAT += bonus; score += bonus;
+        showBonusPop(`+${bonus} Airtime!`);
+        spawnParticles(player.x, player.screenY, '#80deea', 9);
+      }
+      player.airFrames = 0;
+    }
+  }
+
+  // Record trail point
+  player.trail.unshift({ x: player.x, y: player.screenY - player.airH });
+  if (player.trail.length > C.TRAIL_LEN) player.trail.pop();
+}
+
+// ── Controls ───────────────────────────────────────────────
+const KEYS = {};
+let touchDir = 0;  // -1 | 0 | 1
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  touchDir = e.touches[0].clientX < canvas.width / 2 ? -1 : 1;
+  ensureAudio();
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); touchDir = 0; }, { passive: false });
+canvas.addEventListener('touchcancel',e => { touchDir = 0; }, { passive: false });
+
+document.addEventListener('keydown', e => {
+  KEYS[e.key] = true;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); ensureAudio(); }
+});
+document.addEventListener('keyup', e => { KEYS[e.key] = false; });
+
+function steerDir() {
+  if (KEYS['ArrowLeft']  || touchDir === -1) return -1;
+  if (KEYS['ArrowRight'] || touchDir ===  1) return  1;
+  return 0;
+}
+
+// ── Bots ───────────────────────────────────────────────────
+const BOT_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77'];
+let bots = [];
+
+function spawnBots() {
+  bots = BOT_COLORS.map((color, i) => ({
+    x: canvas.width / 2 + (i - 1) * 80,
+    worldY: player.worldY + (i * 100 - 180),
+    vx: 0,
+    color,
+    spd: 0.88 + Math.random() * 0.26,  // speed multiplier relative to scroll
+    trail: [],
+    overtaken: false,
+  }));
+}
+
+function updateBots() {
+  bots.forEach(bot => {
+    bot.worldY += scrollSpeed * bot.spd;
+
+    // Steer toward track centre with damping
+    const seg = segAt(bot.worldY);
+    if (seg) {
+      const hw = seg.width * 0.38;
+      bot.vx += (seg.cx - bot.x) * 0.04;
+      bot.vx *= 0.84;
+      bot.x  += bot.vx;
+      bot.x   = Math.max(seg.cx - hw, Math.min(seg.cx + hw, bot.x));
+    }
+
+    // Trail
+    const sy = w2s(bot.worldY);
+    bot.trail.unshift({ x: bot.x, y: sy });
+    if (bot.trail.length > C.TRAIL_LEN) bot.trail.pop();
+
+    // Overtake check: bot is now behind player by >60 world units
+    if (!bot.overtaken && bot.worldY < player.worldY - 60) {
+      bot.overtaken = true;
+      bonusOT += 100; score += 100;
+      showBonusPop('+100 Overtake! 🏄');
+      sfxNearMiss();
+    }
+    // Respawn bot ahead when it falls far behind
+    if (bot.worldY < player.worldY - canvas.height * 0.9) {
+      bot.worldY  = player.worldY + canvas.height * 0.25 + Math.random() * 180;
+      bot.x       = canvas.width / 2 + (Math.random() - 0.5) * 200;
+      bot.overtaken = false;
+    }
+  });
+}
+
+// ── Obstacle collision ─────────────────────────────────────
+function checkObstacles() {
+  segments.forEach(seg => {
+    if (!seg.obstacle) return;
+    const ob  = seg.obstacle;
+    const ssy = w2s(seg.worldY);   // segment screen Y
+
+    // Skip segments far from player
+    if (Math.abs(ssy - player.screenY) > C.SEG_H * 2.5) return;
+
+    // Is player vertically in this segment?
+    if (!(player.worldY >= seg.worldY && player.worldY < seg.worldY + C.SEG_H)) return;
+
+    const py = player.screenY - player.airH;  // player draw Y
+
+    if (ob.type === 'gap') {
+      // Hole occupies middle 40% of track
+      const hL = seg.cx - seg.width * 0.2;
+      const hR = seg.cx + seg.width * 0.2;
+      if (!player.airborne && player.x > hL && player.x < hR) endGame();
+      return;
+    }
+
+    if (ob.type === 'bumper') {
+      const bx = seg.cx + ob.relX;
+      const dx = player.x - bx, dy = py - ssy;
+      const d  = Math.hypot(dx, dy);
+      if (d < C.PLAYER_R + 20 && !player.airborne) {
+        player.vx = (dx >= 0 ? 1 : -1) * 9;
+        sfxBump();
+        spawnParticles(bx, ssy, '#ff6b6b', 7);
+        ob.hit = true;
+      } else if (d < C.PLAYER_R + 38 && !ob.nearMissTriggered && !ob.hit) {
+        ob.nearMissTriggered = true;
+        bonusNM += 50; score += 50;
+        showBonusPop('+50 Near Miss! 😅');
+        sfxNearMiss();
+        spawnParticles(player.x, py, '#ffd93d', 5);
+      }
+      return;
+    }
+
+    if (ob.type === 'mover') {
+      const t  = frameCount * ob.spd * 0.04 + ob.phase;
+      const bx = seg.cx + Math.sin(t) * seg.width * 0.31;
+      const d  = Math.hypot(player.x - bx, py - ssy);
+      if (d < C.PLAYER_R + 18 && !player.airborne) {
+        player.vx = (player.x - bx) * 0.55;
+        sfxBump();
+        spawnParticles(bx, ssy, '#ff9800', 6);
+      } else if (d < C.PLAYER_R + 34 && !ob.nearMissTriggered) {
+        ob.nearMissTriggered = true;
+        bonusNM += 50; score += 50;
+        showBonusPop('+50 Near Miss! 😅');
+        sfxNearMiss();
+      }
+      return;
+    }
+
+    if (ob.type === 'boost' && !ob.used) {
+      if (Math.hypot(player.x - seg.cx, py - ssy) < C.PLAYER_R + 32) {
+        ob.used = true;
+        scrollSpeed = Math.min(C.MAX_SPEED, scrollSpeed + 3.2);
+        sfxBoost();
+        spawnParticles(seg.cx, ssy, '#6bcb77', 12);
+        showBonusPop('⚡ BOOST!');
+      }
+      return;
+    }
+
+    if (ob.type === 'ramp' && !ob.used && !player.airborne) {
+      const dx = Math.abs(player.x - seg.cx);
+      const dy = Math.abs(py - ssy);
+      if (dx < seg.width * 0.38 && dy < C.SEG_H * 0.7) {
+        ob.used = true;
+        player.airborne = true;
+        player.airVy    = -(7.5 + scrollSpeed * 0.45);
+        player.airH     = 0;
+        sfxJump();
+        spawnParticles(player.x, player.screenY, '#fff', 9);
+      }
+      return;
+    }
+  });
+}
+
+// ── Particles ──────────────────────────────────────────────
+let particles = [];
+
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 2 + Math.random() * 4;
+    particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, r: 3+Math.random()*3, color, life: 1, decay: 0.04+Math.random()*0.04 });
+  }
+}
+
+function updateParticles() {
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.18;
+    p.life -= p.decay; p.r = Math.max(0.5, p.r * 0.97);
+  });
+}
+
+// ── Bonus pop text ─────────────────────────────────────────
+function showBonusPop(text) {
+  const el = document.createElement('div');
+  el.className = 'bonus-pop'; el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+// ── Rendering ──────────────────────────────────────────────
+function render() {
+  const W = canvas.width, H = canvas.height;
+
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#05061a'); sky.addColorStop(1, '#0a1a3a');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+  // Speed-line streaks when going fast
+  if (scrollSpeed > 7) {
+    const alpha = Math.min(0.18, (scrollSpeed - 7) * 0.025);
+    ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${alpha})`; ctx.lineWidth = 1;
+    for (let i = 0; i < 10; i++) {
+      const x = ((i * W / 10 + frameCount * 3.5) % W);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x - 25, H); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ── Track segments ──
+  ctx.save();
+  for (let i = 0; i < segments.length; i++) {
+    const s  = segments[i];
+    const sY = w2s(s.worldY);
+    if (sY > H + C.SEG_H || sY < -C.SEG_H * 3) continue;
+    const n  = segments[i + 1] || s;
+    const nY = w2s(n.worldY);
+
+    const L1 = s.cx - s.width / 2, R1 = s.cx + s.width / 2;
+    const L2 = n.cx - n.width / 2, R2 = n.cx + n.width / 2;
+
+    const isGap = s.obstacle && s.obstacle.type === 'gap';
+
+    if (!isGap) {
+      // Track fill
+      const fill = ctx.createLinearGradient(0, sY, 0, nY);
+      fill.addColorStop(0, '#152b4e'); fill.addColorStop(1, '#1a3560');
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.moveTo(L1, sY); ctx.lineTo(R1, sY);
+      ctx.lineTo(R2, nY); ctx.lineTo(L2, nY);
+      ctx.closePath(); ctx.fill();
+
+      // Centre dashed stripe
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      const cxMid1 = s.cx, cxMid2 = n.cx;
+      ctx.beginPath();
+      ctx.moveTo(cxMid1-7, sY); ctx.lineTo(cxMid1+7, sY);
+      ctx.lineTo(cxMid2+7, nY); ctx.lineTo(cxMid2-7, nY);
+      ctx.closePath(); ctx.fill();
+    } else {
+      // Gap void
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.moveTo(L1, sY); ctx.lineTo(R1, sY);
+      ctx.lineTo(R2, nY); ctx.lineTo(L2, nY);
+      ctx.closePath(); ctx.fill();
+    }
+
+    // Glowing edge lines
+    ctx.shadowColor = '#00bcd4'; ctx.shadowBlur = 8; ctx.strokeStyle = '#00bcd4'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(L1, sY); ctx.lineTo(L2, nY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(R1, sY); ctx.lineTo(R2, nY); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  ctx.restore();
+
+  // ── Obstacles ──
+  ctx.save();
+  segments.forEach(seg => {
+    if (!seg.obstacle) return;
+    const ob  = seg.obstacle;
+    const ssy = w2s(seg.worldY);
+    if (ssy < -C.SEG_H || ssy > H + C.SEG_H) return;
+
+    if (ob.type === 'bumper') {
+      const bx = seg.cx + ob.relX;
+      ctx.shadowColor = '#ff6b6b'; ctx.shadowBlur = ob.hit ? 22 : 10;
+      ctx.fillStyle = ob.hit ? '#ff3333' : '#ff6b6b';
+      ctx.beginPath(); ctx.arc(bx, ssy, 19, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('B', bx, ssy);
+    }
+
+    if (ob.type === 'mover') {
+      const t  = frameCount * ob.spd * 0.04 + ob.phase;
+      const bx = seg.cx + Math.sin(t) * seg.width * 0.31;
+      ctx.shadowColor = '#ff9800'; ctx.shadowBlur = 10;
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath(); ctx.roundRect(bx-24, ssy-14, 48, 28, 8); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#000'; ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('BLOCK', bx, ssy);
+    }
+
+    if (ob.type === 'boost' && !ob.used) {
+      const pulse = 0.82 + 0.18 * Math.sin(frameCount * 0.14);
+      ctx.shadowColor = '#6bcb77'; ctx.shadowBlur = 16;
+      ctx.fillStyle = `rgba(107,203,119,${pulse})`;
+      ctx.beginPath(); ctx.roundRect(seg.cx-38, ssy-13, 76, 26, 13); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('⚡ BOOST', seg.cx, ssy);
+    }
+
+    if (ob.type === 'ramp' && !ob.used) {
+      ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 10;
+      ctx.fillStyle = '#ffd93d';
+      ctx.beginPath();
+      ctx.moveTo(seg.cx-42, ssy+8); ctx.lineTo(seg.cx+42, ssy+8);
+      ctx.lineTo(seg.cx+42, ssy-2); ctx.lineTo(seg.cx, ssy-20);
+      ctx.lineTo(seg.cx-42, ssy-2); ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#333'; ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('RAMP', seg.cx, ssy+1);
+    }
+
+    if (ob.type === 'gap') {
+      ctx.strokeStyle = 'rgba(255,0,0,0.55)'; ctx.setLineDash([5,4]); ctx.lineWidth = 2;
+      const ssy2 = w2s(seg.worldY + C.SEG_H);
+      ctx.beginPath(); ctx.moveTo(seg.cx-seg.width*0.2, ssy); ctx.lineTo(seg.cx-seg.width*0.2, ssy2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(seg.cx+seg.width*0.2, ssy); ctx.lineTo(seg.cx+seg.width*0.2, ssy2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+  ctx.restore();
+
+  // ── Bot trails + bots ──
+  bots.forEach(bot => {
+    const bsy = w2s(bot.worldY);
+    if (bsy < -60 || bsy > H+60) return;
+    ctx.save();
+    bot.trail.forEach((pt, age) => {
+      ctx.globalAlpha = Math.max(0, 0.5 - age*0.018);
+      ctx.fillStyle = bot.color;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, Math.max(1, 3-age*0.07), 0, Math.PI*2); ctx.fill();
+    });
+    // Bot body
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = bot.color; ctx.shadowBlur = 8;
+    const bg = ctx.createRadialGradient(bot.x-3, bsy-3, 1, bot.x, bsy, C.BOT_R);
+    bg.addColorStop(0, '#fff'); bg.addColorStop(0.4, bot.color); bg.addColorStop(1, bot.color+'88');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(bot.x, bsy, C.BOT_R, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  });
+
+  // ── Player trail ──
+  const trailDef = TRAILS.find(t => t.id === selectedTrail) || TRAILS[0];
+  ctx.save();
+  player.trail.forEach((pt, age) => { trailDef.draw(ctx, pt.x, pt.y, age); });
+  ctx.globalAlpha = 1; ctx.restore();
+
+  // ── Player ──
+  const px = player.x, py = player.screenY - player.airH;
+  ctx.save();
+  if (player.airborne) {
+    // Ground shadow
+    const shrink = Math.max(0.2, 1 - player.airH / 180);
+    ctx.globalAlpha = 0.28 * shrink;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(px, player.screenY, C.PLAYER_R*shrink, 4*shrink, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 18;
+  const pg = ctx.createRadialGradient(px-4, py-4, 1, px, py, C.PLAYER_R);
+  pg.addColorStop(0, '#ffffff'); pg.addColorStop(0.35, '#00e5ff'); pg.addColorStop(1, '#0097a7');
+  ctx.fillStyle = pg;
+  ctx.beginPath(); ctx.arc(px, py, C.PLAYER_R, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+
+  // ── Particles ──
+  ctx.save();
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha = 1; ctx.restore();
+
+  // ── Speed bar (bottom-right) ──
+  const barW = 90, barH = 6, bx = W-barW-14, by = H-18;
+  const ratio = Math.min(1, (scrollSpeed - C.BASE_SPEED) / (C.MAX_SPEED - C.BASE_SPEED));
+  const barCol = ratio < 0.5 ? '#6bcb77' : ratio < 0.8 ? '#ffd93d' : '#ff6b6b';
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath(); ctx.roundRect(bx, by, barW, barH, 3); ctx.fill();
+  ctx.fillStyle = barCol;
+  ctx.beginPath(); ctx.roundRect(bx, by, barW*ratio, barH, 3); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText('SPD', bx-5, by+barH);
+}
+
+// ── Game loop ──────────────────────────────────────────────
+function gameLoop() {
+  if (!gameActive) return;
+  frameCount++;
+
+  // Speed ramp
+  scrollSpeed = Math.min(C.MAX_SPEED, C.BASE_SPEED + frameCount * C.SPEED_INC);
+
+  // Distance in metres (1 world unit ≈ 0.1 m)
+  distance = Math.floor(player.worldY / 10);
+  score    = distance + bonusNM + bonusOT + bonusAT;
+
+  buildTrackAhead();
+  updatePlayer();
+  updateBots();
+  checkObstacles();
+  updateParticles();
+
+  // Unlock trails periodically
+  if (frameCount % 60 === 0) checkUnlocks(distance);
+
+  // HUD
+  document.getElementById('hudScore').textContent = score.toLocaleString();
+  document.getElementById('hudDist').textContent  = distance + 'm';
+
+  render();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// ── Start / End game ───────────────────────────────────────
+function startGame() {
+  ensureAudio();
+
+  // Reset state
+  gameActive = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+
+  frameCount  = 0;
+  score       = 0; distance = 0;
+  bonusNM     = 0; bonusOT  = 0; bonusAT = 0;
+  scrollSpeed = C.BASE_SPEED;
+  segments    = []; genWorldY = 0;
+  trkCx       = 0; trkTarget = 0; trkTimer = 0;
+  particles   = [];
+
+  resetPlayer();
+  buildTrackAhead();
+  spawnBots();
+
+  showScreen(null);
+  document.getElementById('hud').classList.remove('hidden');
+  gameActive = true;
+  startMusic();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  if (!gameActive) return;
+  gameActive = false;
+  stopMusic();
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+
+  const isNew = (typeof Scores !== 'undefined') ? Scores.set('slide-dash', score) : false;
+
+  showScreen('gameoverScreen');
+  document.getElementById('finalScore').textContent = score.toLocaleString();
+  document.getElementById('newRecordBadge').classList.toggle('hidden', !isNew);
+
+  document.getElementById('scoreBreakdown').innerHTML = `
+    <div class="breakdown-row"><span>Distance</span><strong>${distance}m</strong></div>
+    <div class="breakdown-row"><span>Near Misses</span><strong>+${bonusNM}</strong></div>
+    <div class="breakdown-row"><span>Overtakes</span><strong>+${bonusOT}</strong></div>
+    <div class="breakdown-row"><span>Airtime</span><strong>+${bonusAT}</strong></div>
+    <div class="breakdown-row breakdown-total"><span>Total</span><strong>${score.toLocaleString()}</strong></div>
+  `;
+
+  // Refresh start screen best score
+  updateStartBest();
+}
+
+// ── Screen management ──────────────────────────────────────
+const SCREENS = ['startScreen','gameoverScreen','settingsScreen','scoresScreen'];
+let settingsReturnTo = 'startScreen';
+
+function showScreen(id) {
+  SCREENS.forEach(s => document.getElementById(s).classList.add('hidden'));
+  document.getElementById('hud').classList.add('hidden');
+  if (id) document.getElementById(id).classList.remove('hidden');
+}
+
+// ── Settings ───────────────────────────────────────────────
+function buildTrailGrid() {
+  const grid = document.getElementById('trailGrid');
+  grid.innerHTML = '';
+  TRAILS.forEach(t => {
+    const unlocked = unlockedTrails.includes(t.id);
+    const div = document.createElement('div');
+    div.className = `trail-card${selectedTrail === t.id ? ' selected' : ''}${!unlocked ? ' locked' : ''}`;
+    div.innerHTML = `<div class="trail-name">${t.name}</div>
+      <div class="trail-req">${t.unlockAt > 0 ? `Unlock @ ${t.unlockAt}m` : 'Always available'}</div>`;
+    if (unlocked) div.addEventListener('click', () => { selectedTrail = t.id; saveTrails(); buildTrailGrid(); });
+    grid.appendChild(div);
+  });
+}
+
+function openSettings(from) {
+  settingsReturnTo = from;
+  buildTrailGrid();
+  document.getElementById('musicVol').value = musicVol * 100;
+  document.getElementById('sfxVol').value   = sfxVol   * 100;
+  showScreen('settingsScreen');
+}
+
+// ── Scores screen ──────────────────────────────────────────
+function buildScoresList() {
+  const sc  = (typeof Scores !== 'undefined') ? Scores.get('slide-dash') : null;
+  const el  = document.getElementById('scoresList');
+  if (!sc) {
+    el.innerHTML = '<p style="color:#80deea;text-align:center">No scores yet.<br>Play to set your record!</p>';
+  } else {
+    const d = new Date(sc.date);
+    el.innerHTML = `<div class="score-card">
+      <div class="score-card-val">${sc.score.toLocaleString()}</div>
+      <div class="score-card-label">Best Score — ${d.toLocaleDateString()}</div>
+    </div>`;
+  }
+}
+
+function updateStartBest() {
+  const sc = (typeof Scores !== 'undefined') ? Scores.get('slide-dash') : null;
+  document.getElementById('startBest').textContent = sc ? sc.score.toLocaleString() : '—';
+}
+
+// ── Wire up UI ─────────────────────────────────────────────
+document.getElementById('playBtn').addEventListener('click', () => startGame());
+document.getElementById('playAgainBtn').addEventListener('click', () => startGame());
+document.getElementById('menuBtn').addEventListener('click', () => { showScreen('startScreen'); updateStartBest(); });
+document.getElementById('settingsBtn').addEventListener('click', () => { ensureAudio(); openSettings('startScreen'); });
+document.getElementById('settingsBackBtn').addEventListener('click', () => showScreen(settingsReturnTo));
+document.getElementById('scoresBtn').addEventListener('click', () => { buildScoresList(); showScreen('scoresScreen'); });
+document.getElementById('scoresBackBtn').addEventListener('click', () => showScreen('startScreen'));
+document.getElementById('muteBtn').addEventListener('click', toggleMute);
+document.getElementById('musicVol').addEventListener('input', e => setMusicVol(+e.target.value));
+document.getElementById('sfxVol').addEventListener('input', e => { setSfxVol(+e.target.value); ensureAudio(); });
+
+// ── Init ───────────────────────────────────────────────────
+function init() {
+  loadTrails();
+  updateStartBest();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+
+
+
+</script>
+</body>
+</html>

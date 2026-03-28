@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Sky Slope Surfer – Airplane Games</title>
+  <base href="/Airplane-Games/">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="js/shared.js" defer></script>
+  <style>
+    /* ── Reset ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #fff; touch-action: none; user-select: none; -webkit-user-select: none; background: #0a1628; }
+
+    /* ── Canvas ───────────────────────────────────────────── */
+    #gameCanvas { display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100dvh; }
+
+    /* ── Screens ──────────────────────────────────────────── */
+    .screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 28px 24px;
+      background: rgba(10, 22, 40, 0.92);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .screen.hidden { display: none; }
+
+    /* ── Title ────────────────────────────────────────────── */
+    .game-title {
+      font-size: clamp(1.9rem, 7.5vw, 2.8rem); font-weight: 900; letter-spacing: -1px;
+      background: linear-gradient(135deg, #64ffda 0%, #00bcd4 45%, #448aff 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 4px; text-align: center; line-height: 1.1;
+    }
+    .game-subtitle { color: #80deea; font-size: 0.88rem; margin-bottom: 6px; text-align: center; }
+    .section-title  { font-size: 1.3rem; font-weight: 800; margin-bottom: 16px; text-align: center; }
+
+    /* ── Stats row (start screen) ─────────────────────────── */
+    .stats-row {
+      display: flex; gap: 12px; margin-bottom: 22px;
+    }
+    .stat-pill {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 20px; padding: 8px 14px; font-size: 0.82rem; text-align: center;
+    }
+    .stat-pill strong { display: block; font-size: 1.05rem; color: #64ffda; }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .btn {
+      display: block; width: 100%; max-width: 300px; padding: 14px 24px; margin: 7px 0;
+      border: none; border-radius: 16px; font-size: 1.02rem; font-weight: 700;
+      cursor: pointer; text-align: center; text-decoration: none;
+      transition: transform 0.1s; -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary   { background: linear-gradient(135deg, #00bcd4, #448aff); color: #fff; box-shadow: 0 4px 20px rgba(0,188,212,0.35); }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
+    .btn-shop      { background: linear-gradient(135deg, #ffd740, #ff6d00); color: #000; font-weight: 800; }
+
+    /* ── HUD ──────────────────────────────────────────────── */
+    #hud { position: fixed; top: 0; left: 0; right: 0; z-index: 10; padding: 12px 16px; pointer-events: none; display: flex; justify-content: space-between; align-items: flex-start; }
+    #hud.hidden { display: none; }
+    .hud-left  { display: flex; flex-direction: column; gap: 3px; }
+    .hud-dist  { font-size: 1.5rem; font-weight: 900; text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+    .hud-coins { font-size: 0.8rem; color: #ffd740; }
+    .hud-right { display: flex; gap: 8px; pointer-events: auto; }
+    .hud-icon-btn {
+      background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; border-radius: 50%; width: 40px; height: 40px;
+      font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Sky Meter ────────────────────────────────────────── */
+    #skyMeterWrap {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      width: min(320px, 85vw); z-index: 10; pointer-events: none;
+    }
+    #skyMeterWrap.hidden { display: none; }
+    .sky-meter-label { font-size: 0.7rem; color: #80deea; text-align: center; margin-bottom: 4px; letter-spacing: 1px; text-transform: uppercase; }
+    .sky-meter-track {
+      height: 10px; border-radius: 5px;
+      background: rgba(255,255,255,0.15); overflow: hidden;
+      box-shadow: 0 0 8px rgba(0,188,212,0.3);
+    }
+    #skyMeterFill { height: 100%; border-radius: 5px; transition: width 0.1s linear; background: linear-gradient(90deg, #00bcd4, #64ffda); }
+    #skyMeterFill.critical { background: linear-gradient(90deg, #ff1744, #ff6d00); animation: critPulse 0.4s infinite alternate; }
+    @keyframes critPulse { from { opacity: 1; } to { opacity: 0.5; } }
+
+    /* ── Biome badge ──────────────────────────────────────── */
+    #biomeBadge {
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 20px; padding: 5px 16px; font-size: 0.8rem; font-weight: 700;
+      z-index: 10; pointer-events: none; opacity: 0; transition: opacity 0.4s;
+    }
+
+    /* ── Floating text popups ─────────────────────────────── */
+    .float-pop {
+      position: fixed; pointer-events: none; z-index: 30;
+      font-weight: 900; font-size: 1.1rem;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+      animation: floatUp 0.9s ease-out forwards;
+      white-space: nowrap;
+    }
+    @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-60px) scale(1.3); } }
+
+    /* ── Game Over ────────────────────────────────────────── */
+    .go-dist    { font-size: 2.6rem; font-weight: 900; color: #64ffda; margin: 8px 0; }
+    .go-sub     { color: #80deea; font-size: 0.88rem; margin-bottom: 6px; }
+    .new-record { background: linear-gradient(135deg, #ffd700, #ff9800); color: #000; padding: 5px 16px; border-radius: 20px; font-weight: 900; font-size: 0.85rem; margin-bottom: 8px; display: inline-block; }
+    .go-stats   { display: flex; gap: 14px; margin: 12px 0; }
+    .go-stat    { background: rgba(255,255,255,0.07); border-radius: 12px; padding: 10px 16px; text-align: center; }
+    .go-stat-v  { font-size: 1.3rem; font-weight: 900; color: #ffd740; }
+    .go-stat-l  { font-size: 0.75rem; color: #80deea; margin-top: 2px; }
+
+    /* ── Upgrade Shop ─────────────────────────────────────── */
+    .shop-header { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 360px; margin-bottom: 14px; }
+    .shop-currency { display: flex; gap: 14px; }
+    .currency-pill { background: rgba(255,255,255,0.08); border-radius: 20px; padding: 6px 14px; font-size: 0.85rem; }
+    .currency-pill span { font-weight: 700; }
+    .coin-c    { color: #ffd740; }
+    .crystal-c { color: #e040fb; }
+
+    .upgrade-list { overflow-y: auto; max-height: 55vh; width: 100%; max-width: 360px; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 8px; }
+    .upgrade-card {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px; padding: 12px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .upgrade-card.maxed { opacity: 0.5; }
+    .upg-info  { flex: 1; margin-right: 10px; }
+    .upg-name  { font-weight: 700; font-size: 0.9rem; }
+    .upg-desc  { font-size: 0.75rem; color: #80deea; margin-top: 2px; }
+    .upg-level { font-size: 0.72rem; color: #64ffda; margin-top: 3px; }
+    .upg-buy   { background: linear-gradient(135deg, #ffd740, #ff9800); color: #000; border: none; border-radius: 10px; padding: 7px 12px; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap; min-width: 64px; text-align: center; }
+    .upg-buy:disabled { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.4); cursor: default; }
+    .upg-category { font-size: 0.7rem; font-weight: 700; color: #64ffda; letter-spacing: 1px; text-transform: uppercase; margin-top: 8px; margin-bottom: 2px; padding-left: 4px; }
+
+    /* ── Settings ─────────────────────────────────────────── */
+    .settings-group { width: 100%; max-width: 300px; margin-bottom: 16px; }
+    .settings-label { color: #80deea; font-size: 0.82rem; margin-bottom: 8px; display: block; }
+    .slider { width: 100%; height: 6px; accent-color: #00bcd4; cursor: pointer; }
+
+    /* ── Pause ────────────────────────────────────────────── */
+    #pauseScreen .section-title { margin-bottom: 28px; }
+
+    /* ── Scroll wrap ──────────────────────────────────────── */
+    .scroll-wrap { overflow-y: auto; max-height: 60vh; width: 100%; display: flex; flex-direction: column; align-items: center; -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body>
+
+<!-- Canvas -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD (during play) -->
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div class="hud-dist"  id="hudDist">0m</div>
+    <div class="hud-coins" id="hudCoins">🪙 0</div>
+  </div>
+  <div class="hud-right">
+    <button class="hud-icon-btn" id="muteBtn"  aria-label="Mute">🔊</button>
+    <button class="hud-icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+  </div>
+</div>
+
+<!-- Sky Meter -->
+<div id="skyMeterWrap" class="hidden">
+  <div class="sky-meter-label">Sky Meter</div>
+  <div class="sky-meter-track"><div id="skyMeterFill" style="width:100%"></div></div>
+</div>
+
+<!-- Biome badge -->
+<div id="biomeBadge"></div>
+
+<!-- Start Screen -->
+<div id="startScreen" class="screen">
+  <div class="game-title">Sky Slope<br>Surfer</div>
+  <div class="game-subtitle">Dive the slopes · Ride the air · Go far</div>
+  <div class="stats-row">
+    <div class="stat-pill"><strong id="bestDist">0m</strong>Best</div>
+    <div class="stat-pill"><strong id="totalCoins" class="coin-c">0</strong>Coins</div>
+    <div class="stat-pill"><strong id="totalCrystals" class="crystal-c">0</strong>Crystals</div>
+  </div>
+  <button class="btn btn-primary"   id="playBtn">▶&nbsp; Play</button>
+  <button class="btn btn-shop"      id="shopBtn">🛒&nbsp; Upgrades</button>
+  <button class="btn btn-secondary" id="settingsBtn">⚙&nbsp; Settings</button>
+  <a href="../../" class="btn btn-secondary">🏠&nbsp; Back to Hub</a>
+</div>
+
+<!-- Pause Screen -->
+<div id="pauseScreen" class="screen hidden">
+  <div class="section-title">⏸ Paused</div>
+  <button class="btn btn-primary"   id="resumeBtn">▶ Resume</button>
+  <button class="btn btn-secondary" id="pauseRestartBtn">↺ Restart</button>
+  <button class="btn btn-secondary" id="pauseMenuBtn">🏠 Menu</button>
+</div>
+
+<!-- Game Over Screen -->
+<div id="gameoverScreen" class="screen hidden">
+  <div class="section-title">Game Over</div>
+  <div id="newRecordBadge" class="new-record hidden">🏆 NEW RECORD!</div>
+  <div class="go-dist" id="goDist">0m</div>
+  <div class="go-sub" id="goSub">Best: 0m</div>
+  <div class="go-stats">
+    <div class="go-stat"><div class="go-stat-v" id="goCoins">0</div><div class="go-stat-l">🪙 Coins</div></div>
+    <div class="go-stat"><div class="go-stat-v" id="goCrystals">0</div><div class="go-stat-l">💎 Crystals</div></div>
+    <div class="go-stat"><div class="go-stat-v" id="goLaunches">0</div><div class="go-stat-l">🚀 Launches</div></div>
+  </div>
+  <button class="btn btn-primary"   id="playAgainBtn">▶ Play Again</button>
+  <button class="btn btn-shop"      id="goShopBtn">🛒 Upgrades</button>
+  <button class="btn btn-secondary" id="goMenuBtn">🏠 Menu</button>
+</div>
+
+<!-- Upgrade Shop Screen -->
+<div id="shopScreen" class="screen hidden">
+  <div class="shop-header">
+    <div class="section-title" style="margin:0">🛒 Upgrades</div>
+    <div class="shop-currency">
+      <div class="currency-pill">🪙 <span class="coin-c" id="shopCoins">0</span></div>
+      <div class="currency-pill">💎 <span class="crystal-c" id="shopCrystals">0</span></div>
+    </div>
+  </div>
+  <div class="upgrade-list" id="upgradeList"></div>
+  <button class="btn btn-secondary" id="shopBackBtn" style="margin-top:14px;max-width:200px">← Back</button>
+</div>
+
+<!-- Settings Screen -->
+<div id="settingsScreen" class="screen hidden">
+  <div class="section-title">⚙ Settings</div>
+  <div class="scroll-wrap">
+    <div class="settings-group">
+      <label class="settings-label">🎵 Music Volume</label>
+      <input type="range" class="slider" id="musicVol" min="0" max="100" value="35">
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">🔔 SFX Volume</label>
+      <input type="range" class="slider" id="sfxVol" min="0" max="100" value="70">
+    </div>
+  </div>
+  <button class="btn btn-secondary" id="settingsBackBtn" style="margin-top:16px">← Back</button>
+</div>
+
+<script>
+/* =============================================================
+   SKY SLOPE SURFER
+   Architecture mirrors modular file structure:
+     STORAGE ENGINE  → storage.js
+     AUDIO ENGINE    → audio.js
+     UPGRADES ENGINE → upgrades.js
+     HILLS ENGINE    → hills.js
+     BIOMES ENGINE   → biomes.js
+     PLAYER PHYSICS  → player.js / physics.js
+     RENDERING       → hud.js / canvas rendering
+     MENUS           → menu.js / shop.js
+   ============================================================= */
+
+// ── Canvas ────────────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+/* =============================================================
+   STORAGE ENGINE  (mirrors storage.js)
+   ============================================================= */
+const Storage = {
+  KEY: 'ag_sky_slope',
+  defaults() {
+    return {
+      bestDistance: 0,
+      coins: 0,
+      crystals: 0,
+      upgrades: {},   // { upgradeId: level }
+      settings: { musicVol: 35, sfxVol: 70 },
+    };
+  },
+  load() {
+    try { return Object.assign(this.defaults(), JSON.parse(localStorage.getItem(this.KEY) || '{}')); }
+    catch(_) { return this.defaults(); }
+  },
+  save(data) {
+    try { localStorage.setItem(this.KEY, JSON.stringify(data)); } catch(_) {}
+  },
+};
+
+let saveData = Storage.load();
+
+function persistSave() { Storage.save(saveData); }
+
+/* =============================================================
+   AUDIO ENGINE  (mirrors audio.js)
+   ============================================================= */
+let audioCtx = null, musicGain = null, sfxGain = null;
+let musicTimers = [];
+let isMuted = false;
+let musicVol = saveData.settings.musicVol / 100;
+let sfxVol   = saveData.settings.sfxVol   / 100;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  musicGain = audioCtx.createGain(); musicGain.gain.value = musicVol; musicGain.connect(audioCtx.destination);
+  sfxGain   = audioCtx.createGain(); sfxGain.gain.value   = sfxVol;   sfxGain.connect(audioCtx.destination);
+}
+function ensureAudio() {
+  initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function toggleMute() {
+  isMuted = !isMuted;
+  if (audioCtx) { musicGain.gain.value = isMuted ? 0 : musicVol; sfxGain.gain.value = isMuted ? 0 : sfxVol; }
+  document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+}
+function setMusicVol(v) {
+  musicVol = v / 100; saveData.settings.musicVol = v; persistSave();
+  if (audioCtx && !isMuted) musicGain.gain.value = musicVol;
+}
+function setSfxVol(v) {
+  sfxVol = v / 100; saveData.settings.sfxVol = v; persistSave();
+  if (audioCtx && !isMuted) sfxGain.gain.value = sfxVol;
+}
+
+// Ambient wind-like background music
+function startMusic() {
+  if (!audioCtx) return;
+  stopMusic();
+  // Soft ambient pad: two slightly detuned sines
+  [130.8, 131.5, 196.0, 196.6].forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.value = 0.045 - i * 0.008;
+    o.connect(g); g.connect(musicGain); o.start();
+    musicTimers.push(() => { try { o.stop(); } catch(_) {} });
+  });
+  // Gentle melodic notes
+  const mel = [261.6, 329.6, 392.0, 440.0, 392.0, 329.6, 261.6, 220.0];
+  let mi = 0;
+  function schedMel() {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'triangle'; o.frequency.value = mel[mi++ % mel.length];
+    const t = audioCtx.currentTime;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.07, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    o.connect(g); g.connect(musicGain); o.start(t); o.stop(t + 0.75);
+    musicTimers.push(setTimeout(schedMel, 500));
+  }
+  schedMel();
+}
+function stopMusic() { musicTimers.forEach(x => typeof x === 'function' ? x() : clearTimeout(x)); musicTimers = []; }
+
+// SFX
+function sfxLaunch() {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'sine'; const t = audioCtx.currentTime;
+  o.frequency.setValueAtTime(200, t); o.frequency.exponentialRampToValueAtTime(600, t + 0.18);
+  g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.22);
+}
+function sfxDive() {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'sawtooth'; const t = audioCtx.currentTime;
+  o.frequency.setValueAtTime(300, t); o.frequency.exponentialRampToValueAtTime(80, t + 0.12);
+  g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.15);
+}
+function sfxCoin() {
+  if (!audioCtx) return;
+  [523.2, 659.3].forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.05;
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.12);
+  });
+}
+function sfxCrystal() {
+  if (!audioCtx) return;
+  [880, 1108, 1318, 1760].forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.06;
+    o.type = 'triangle'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.16);
+  });
+}
+function sfxBoostPickup() {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'square'; const t = audioCtx.currentTime;
+  o.frequency.setValueAtTime(400, t); o.frequency.exponentialRampToValueAtTime(800, t + 0.15);
+  g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.2);
+}
+function sfxGameOver() {
+  if (!audioCtx) return;
+  [350, 280, 200, 140].forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.2;
+    o.type = 'sawtooth'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.24);
+  });
+}
+function sfxBiome() {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'sine'; const t = audioCtx.currentTime;
+  o.frequency.setValueAtTime(440, t); o.frequency.exponentialRampToValueAtTime(880, t + 0.3);
+  g.gain.setValueAtTime(0.15, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 0.4);
+}
+
+/* =============================================================
+   CONSTANTS
+   ============================================================= */
+const C = {
+  GRAVITY          : 0.5,
+  DIVE_ACCEL       : 0.8,
+  DRAG             : 0.995,
+  LAUNCH_MULT      : 1.8,   // velocity boost on upslope release
+  SKY_METER_MAX    : 100,
+  SKY_METER_DRAIN  : 0.12,  // per frame while grounded or low
+  SKY_METER_REFILL : 0.35,  // per frame while airborne
+  PLAYER_W         : 36,
+  PLAYER_H         : 20,
+  SCROLL_SPEED_BASE: 5,
+  COLLECTIBLE_DIST : 50,    // spawn every ~50px
+  BIOME_DIST       : 2000,  // metres per biome
+};
+
+/* =============================================================
+   UPGRADES ENGINE  (mirrors upgrades.js)
+   ============================================================= */
+const UPGRADES = [
+  // Movement
+  { id:'glideEff',       cat:'Movement', name:'Glide Efficiency',        desc:'Reduces air drag while gliding',          maxLevel:5, costCoins:[ 30, 70,140,260,450], costCrystals:[0,0,0,1,2], effect:()=>{ C.DRAG = 0.995 + getUpg('glideEff')*0.001; } },
+  { id:'diveAccel',      cat:'Movement', name:'Dive Acceleration',       desc:'Dive pushes you down faster',             maxLevel:5, costCoins:[ 40, 80,160,280,480], costCrystals:[0,0,0,1,2], effect:()=>{ C.DIVE_ACCEL = 0.8 + getUpg('diveAccel')*0.12; } },
+  { id:'launchPower',    cat:'Movement', name:'Launch Power',            desc:'Greater velocity burst off slopes',       maxLevel:5, costCoins:[ 50,100,200,350,600], costCrystals:[0,0,0,2,3], effect:()=>{ C.LAUNCH_MULT = 1.8 + getUpg('launchPower')*0.15; } },
+  { id:'dragReduce',     cat:'Movement', name:'Drag Reduction',          desc:'Less wind resistance overall',            maxLevel:4, costCoins:[ 60,130,250,500],     costCrystals:[0,0,1,2],   effect:()=>{ C.DRAG = Math.min(0.9995, C.DRAG + getUpg('dragReduce')*0.0005); } },
+  { id:'perfectLaunch',  cat:'Movement', name:'Perfect Launch Mult',     desc:'+50% bonus on perfect-angle launches',    maxLevel:3, costCoins:[100,220,420],         costCrystals:[1,2,3],     effect:()=>{} },
+  // Utility
+  { id:'coinMagnet',     cat:'Utility',  name:'Coin Magnet',             desc:'Attracts coins from further away',        maxLevel:4, costCoins:[ 50,110,220,400],     costCrystals:[0,0,1,2],   effect:()=>{} },
+  { id:'skyCapacity',    cat:'Utility',  name:'Sky Meter Capacity',      desc:'Larger sky meter',                        maxLevel:5, costCoins:[ 40, 90,180,320,560], costCrystals:[0,0,0,1,2], effect:()=>{ C.SKY_METER_MAX = 100 + getUpg('skyCapacity')*20; } },
+  { id:'skyRecharge',    cat:'Utility',  name:'Sky Meter Recharge',      desc:'Refills sky meter faster when airborne',  maxLevel:5, costCoins:[ 35, 75,150,270,480], costCrystals:[0,0,0,1,2], effect:()=>{ C.SKY_METER_REFILL = 0.35 + getUpg('skyRecharge')*0.06; } },
+  { id:'windResist',     cat:'Utility',  name:'Wind Resistance',         desc:'Less slowdown in headwind biomes',        maxLevel:3, costCoins:[ 80,170,320],         costCrystals:[0,1,2],     effect:()=>{} },
+  { id:'boostDuration',  cat:'Utility',  name:'Boost Duration',          desc:'Temporary boosts last longer',            maxLevel:4, costCoins:[ 60,130,260,480],     costCrystals:[0,0,1,2],   effect:()=>{} },
+  // Special
+  { id:'doubleJump',     cat:'Special',  name:'Double Jump',             desc:'Tap again mid-air for an extra boost',    maxLevel:1, costCoins:[300],                 costCrystals:[3],         effect:()=>{} },
+  { id:'cloudBounce',    cat:'Special',  name:'Cloud Bounce',            desc:'Bounce off clouds for extra height',      maxLevel:1, costCoins:[400],                 costCrystals:[4],         effect:()=>{} },
+  { id:'meteorDash',     cat:'Special',  name:'Meteor Dash',             desc:'Hold during dive for a speed burst',      maxLevel:1, costCoins:[500],                 costCrystals:[5],         effect:()=>{} },
+];
+
+function getUpg(id) { return saveData.upgrades[id] || 0; }
+function applyAllUpgrades() { UPGRADES.forEach(u => u.effect()); }
+
+/* =============================================================
+   BIOMES ENGINE  (mirrors biomes.js)
+   ============================================================= */
+const BIOMES = [
+  { name:'🌿 Meadows',  hillAmp:80,  hillFreq:0.018, hillSpeed:1,    skyTop:'#1a6de0', skyBot:'#7bc8f0', groundTop:'#4caf50', groundBot:'#2e7d32', hazard:null },
+  { name:'🏜️ Desert',   hillAmp:60,  hillFreq:0.025, hillSpeed:1.1,  skyTop:'#e65100', skyBot:'#ffcc80', groundTop:'#f9a825', groundBot:'#e65100', hazard:'dust' },
+  { name:'❄️ Tundra',   hillAmp:100, hillFreq:0.014, hillSpeed:0.9,  skyTop:'#0d47a1', skyBot:'#b3e5fc', groundTop:'#e0f7fa', groundBot:'#80deea', hazard:'wind' },
+  { name:'🌋 Volcano',  hillAmp:120, hillFreq:0.012, hillSpeed:1.2,  skyTop:'#bf360c', skyBot:'#ff6d00', groundTop:'#b71c1c', groundBot:'#880e4f', hazard:'rocks' },
+  { name:'🌌 Cosmos',   hillAmp:140, hillFreq:0.010, hillSpeed:1.4,  skyTop:'#0d0030', skyBot:'#1a0050', groundTop:'#4a148c', groundBot:'#1a0050', hazard:'voids' },
+];
+
+function getBiome(dist) {
+  const idx = Math.floor(dist / C.BIOME_DIST) % BIOMES.length;
+  return BIOMES[idx];
+}
+
+/* =============================================================
+   HILLS ENGINE  (mirrors hills.js)
+   ============================================================= */
+// Hills are defined by a continuous sine-based height function.
+// We sample N points ahead, compute normals, and draw as a filled polygon.
+
+const HILL_POINTS = 120;  // points to pre-compute across screen width
+
+// Deterministic noise using sum of sines (seeded by world offset)
+function hillY(worldX, biome) {
+  const f = biome.hillFreq;
+  const a = biome.hillAmp;
+  // Layer multiple frequencies for organic look
+  return (
+    Math.sin(worldX * f)           * a       +
+    Math.sin(worldX * f * 2.3 + 1) * a * 0.4 +
+    Math.sin(worldX * f * 0.5 + 2) * a * 0.6
+  );
+}
+
+// Returns ground Y for a given worldX (screen-space Y from bottom)
+function groundY(worldX, biome) {
+  const base = canvas.height * 0.62;
+  return base + hillY(worldX, biome);
+}
+
+// Compute hill slope normal angle at worldX
+function hillNormal(worldX, biome) {
+  const dx = 1;
+  const y1 = groundY(worldX, biome);
+  const y2 = groundY(worldX + dx, biome);
+  return Math.atan2(y2 - y1, dx); // angle of slope (positive = downhill)
+}
+
+/* =============================================================
+   PARALLAX BACKGROUND  (part of biomes.js)
+   ============================================================= */
+// Generates and draws layered parallax backgrounds per biome
+function drawBackground(worldX, biome) {
+  const W = canvas.width, H = canvas.height;
+
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H * 0.7);
+  sky.addColorStop(0, biome.skyTop);
+  sky.addColorStop(1, biome.skyBot);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+  // Parallax cloud layer (layer 1 — slowest, furthest)
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < 6; i++) {
+    const cx = ((i * 180 - worldX * 0.1) % (W + 200) + W + 200) % (W + 200) - 100;
+    const cy = 60 + (i * 37) % 80;
+    const cr = 28 + (i * 17) % 30;
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI*2);
+    ctx.arc(cx+cr*0.6, cy-cr*0.3, cr*0.7, 0, Math.PI*2);
+    ctx.arc(cx-cr*0.5, cy-cr*0.2, cr*0.6, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // Parallax cloud layer (layer 2 — faster, closer)
+  ctx.globalAlpha = 0.12;
+  for (let i = 0; i < 4; i++) {
+    const cx = ((i * 260 - worldX * 0.25) % (W + 300) + W + 300) % (W + 300) - 100;
+    const cy = 100 + (i * 53) % 100;
+    const cr = 20 + (i * 23) % 25;
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI*2);
+    ctx.arc(cx+cr*0.55, cy-cr*0.3, cr*0.65, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1; ctx.restore();
+
+  // Distant hills (silhouette layer, parallax 0.4)
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = biome.groundBot;
+  ctx.beginPath(); ctx.moveTo(0, H);
+  for (let px = 0; px <= W; px += 6) {
+    const wx = worldX * 0.4 + px;
+    const gy = groundY(wx, biome) - 60;
+    ctx.lineTo(px, gy);
+  }
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1; ctx.restore();
+}
+
+// Draw main hills polygon
+function drawHills(worldX, biome) {
+  const W = canvas.width, H = canvas.height;
+
+  // Ground fill
+  const gFill = ctx.createLinearGradient(0, H * 0.5, 0, H);
+  gFill.addColorStop(0, biome.groundTop);
+  gFill.addColorStop(1, biome.groundBot);
+  ctx.fillStyle = gFill;
+
+  ctx.beginPath(); ctx.moveTo(0, H);
+  for (let px = 0; px <= W; px += 4) {
+    const gy = groundY(worldX + px, biome);
+    if (px === 0) ctx.moveTo(px, gy);
+    else ctx.lineTo(px, gy);
+  }
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+
+  // Ground surface highlight line
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let px = 0; px <= W; px += 4) {
+    const gy = groundY(worldX + px, biome);
+    if (px === 0) ctx.moveTo(px, gy);
+    else ctx.lineTo(px, gy);
+  }
+  ctx.stroke();
+}
+
+/* =============================================================
+   PLAYER PHYSICS  (mirrors player.js + physics.js)
+   ============================================================= */
+const player = {
+  // Screen position (player is always drawn at fixed screen X)
+  screenX : 0,
+  screenY : 0,
+  // World velocity
+  vx      : 0,
+  vy      : 0,
+  // State
+  grounded     : false,
+  airborne     : false,
+  holding      : false,   // finger/mouse held
+  justLaunched : false,
+  launchAngle  : 0,
+  doubleJumped : false,
+  // Visual tilt
+  tilt         : 0,
+  // Active boosts: { type, framesLeft }
+  boosts       : [],
+  // Stats this run
+  launches     : 0,
+  skyMeter     : 100,
+};
+
+function resetPlayer() {
+  player.screenX   = canvas.width * 0.25;
+  player.screenY   = canvas.height * 0.4;
+  player.vx        = C.SCROLL_SPEED_BASE;
+  player.vy        = 0;
+  player.grounded  = false;
+  player.airborne  = false;
+  player.holding   = false;
+  player.justLaunched = false;
+  player.launchAngle  = 0;
+  player.doubleJumped = false;
+  player.tilt      = 0;
+  player.boosts    = [];
+  player.launches  = 0;
+  player.skyMeter  = C.SKY_METER_MAX;
+}
+
+// worldX is the camera offset (scrolled distance in px)
+let worldX    = 0;
+let distance  = 0;  // metres
+let coinsRun  = 0;
+let crystalsRun = 0;
+let frameCount  = 0;
+
+function updatePlayer(biome) {
+  const gy  = groundY(worldX + player.screenX, biome);  // ground Y at player X
+  const ang = hillNormal(worldX + player.screenX, biome);
+
+  // ── Horizontal scroll speed
+  let hSpd = C.SCROLL_SPEED_BASE + distance * 0.0015;  // gradually accelerate
+  // Active speed boost
+  if (hasBoost('speed')) hSpd *= 1.6;
+  // Biome wind hazard
+  if (biome.hazard === 'wind' && !getUpg('windResist')) hSpd *= 0.88;
+  hSpd = Math.min(hSpd, 18);
+
+  // Advance world
+  worldX += hSpd;
+
+  // ── Vertical physics
+  if (player.grounded) {
+    // Ride the slope: align vy with slope
+    player.vy = Math.tan(ang) * hSpd;
+    player.screenY = gy;
+    player.tilt = ang * 0.7;
+
+    if (player.holding) {
+      // Dive: press into slope
+      player.vy += C.DIVE_ACCEL;
+    } else {
+      // Not holding: check for upslope launch
+      if (ang < -0.18) {
+        // Upslope → launch!
+        const spd  = Math.sqrt(hSpd * hSpd + player.vy * player.vy);
+        const mult = C.LAUNCH_MULT * (1 + (getUpg('perfectLaunch') * (ang < -0.35 ? 0.5 : 0)));
+        player.vy  = -spd * mult * Math.abs(ang) * 0.9;
+        player.vx  = hSpd;
+        player.grounded = false;
+        player.airborne = true;
+        player.justLaunched = true;
+        player.doubleJumped = false;
+        player.launches++;
+        sfxLaunch();
+      }
+    }
+  } else {
+    // Airborne
+    player.vx *= C.DRAG;
+    if (player.holding) {
+      // Dive acceleration in air
+      player.vy += C.DIVE_ACCEL * 0.7;
+      if (player.justLaunched) sfxDive();
+    } else {
+      player.vy += C.GRAVITY;
+    }
+    player.justLaunched = false;
+    player.vy *= C.DRAG;
+    player.screenY += player.vy;
+    player.tilt = Math.atan2(player.vy, hSpd) * 0.6;
+
+    // Double jump
+    if (!player.doubleJumped && getUpg('doubleJump') && justReleased) {
+      player.vy = -8;
+      player.doubleJumped = true;
+      sfxLaunch();
+    }
+
+    // Land check
+    if (player.screenY >= gy) {
+      player.screenY  = gy;
+      player.grounded = true;
+      player.airborne = false;
+    }
+
+    // Ceiling (bounce off if cloudBounce upgrade)
+    const ceiling = canvas.height * 0.08;
+    if (player.screenY < ceiling) {
+      if (getUpg('cloudBounce')) { player.vy = Math.abs(player.vy) * 0.7; sfxLaunch(); }
+      else player.screenY = ceiling;
+    }
+  }
+
+  // ── Sky Meter
+  if (player.grounded) {
+    player.skyMeter = Math.max(0, player.skyMeter - C.SKY_METER_DRAIN);
+  } else {
+    const recharge = C.SKY_METER_REFILL * (hasBoost('glide') ? 2 : 1);
+    player.skyMeter = Math.min(C.SKY_METER_MAX, player.skyMeter + recharge);
+  }
+}
+
+let justReleased = false;
+
+// ── Controls ─────────────────────────────────────────────
+let pressing = false;
+function onPress() {
+  pressing = true; player.holding = true;
+  justReleased = false;
+  // Meteor dash: hold mid-air
+  if (!player.grounded && getUpg('meteorDash')) {
+    player.vy += 3;
+  }
+  ensureAudio();
+}
+function onRelease() {
+  pressing = false; player.holding = false;
+  justReleased = true;
+}
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); onPress(); }, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); onRelease(); }, { passive: false });
+canvas.addEventListener('touchcancel',e => { onRelease(); });
+canvas.addEventListener('mousedown',  e => { onPress(); });
+canvas.addEventListener('mouseup',    e => { onRelease(); });
+document.addEventListener('keydown',  e => { if (e.code === 'Space' || e.code === 'ArrowDown') { e.preventDefault(); if (!pressing) onPress(); } });
+document.addEventListener('keyup',    e => { if (e.code === 'Space' || e.code === 'ArrowDown') { e.preventDefault(); onRelease(); } });
+
+// ── Boost helpers ─────────────────────────────────────────
+function hasBoost(type) { return player.boosts.some(b => b.type === type && b.framesLeft > 0); }
+function addBoost(type) {
+  const dur = (90 + getUpg('boostDuration') * 30);
+  const existing = player.boosts.find(b => b.type === type);
+  if (existing) existing.framesLeft = Math.max(existing.framesLeft, dur);
+  else player.boosts.push({ type, framesLeft: dur });
+}
+function tickBoosts() { player.boosts = player.boosts.filter(b => { b.framesLeft--; return b.framesLeft > 0; }); }
+
+/* =============================================================
+   COLLECTIBLES
+   ============================================================= */
+let collectibles = [];
+let nextCollX    = 300;  // worldX for next collectible spawn
+
+function spawnCollectibles(biome) {
+  while (nextCollX < worldX + canvas.width + 200) {
+    const x = nextCollX;
+    const y = groundY(x, biome) - 25 - Math.random() * 80;
+    const r = Math.random();
+    let type;
+    if (r < 0.60)      type = 'coin';
+    else if (r < 0.82) type = 'coin';  // cluster
+    else if (r < 0.93) type = 'boost_speed';
+    else if (r < 0.97) type = 'boost_glide';
+    else               type = 'crystal';
+    collectibles.push({ x, y, type, collected: false, bobOffset: Math.random() * Math.PI * 2 });
+    nextCollX += C.COLLECTIBLE_DIST + Math.random() * 80;
+  }
+  // Cull far-behind collectibles
+  const cutoff = worldX - 200;
+  collectibles = collectibles.filter(c => c.x > cutoff);
+}
+
+function checkCollectibles(biome) {
+  const magnetR = 40 + getUpg('coinMagnet') * 30;
+  collectibles.forEach(c => {
+    if (c.collected) return;
+    const sx = c.x - worldX;  // screen X
+    const dx = sx - player.screenX;
+    const dy = c.y - player.screenY;
+    const dist = Math.hypot(dx, dy);
+
+    // Magnet pull
+    if (dist < magnetR && (c.type === 'coin' || c.type === 'crystal')) {
+      c.x -= dx * 0.08; c.y -= dy * 0.08;
+    }
+
+    const pickR = c.type === 'crystal' ? 20 : 16;
+    if (dist < pickR) {
+      c.collected = true;
+      if (c.type === 'coin')        { coinsRun++; sfxCoin(); showFloatText('+1🪙', sx, c.y); }
+      else if (c.type === 'crystal') { crystalsRun++; sfxCrystal(); showFloatText('+1💎', sx, c.y); }
+      else if (c.type === 'boost_speed') { addBoost('speed'); sfxBoostPickup(); showFloatText('⚡SPEED!', sx, c.y); }
+      else if (c.type === 'boost_glide') { addBoost('glide'); sfxBoostPickup(); showFloatText('🌬GLIDE!', sx, c.y); }
+    }
+  });
+}
+
+// Floating text
+function showFloatText(text, sx, sy, color = '#ffd740') {
+  const el = document.createElement('div');
+  el.className = 'float-pop';
+  el.style.cssText = `left:${sx}px;top:${sy}px;color:${color}`;
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+/* =============================================================
+   PARTICLES
+   ============================================================= */
+let particles = [];
+
+function spawnTrailParticle(biome) {
+  const col = hasBoost('speed') ? '#ff6d00' : (hasBoost('glide') ? '#64ffda' : 'rgba(255,255,255,0.7)');
+  particles.push({
+    x: player.screenX - 10 + Math.random() * 6,
+    y: player.screenY  + Math.random() * 6,
+    vx: -2 - Math.random() * 2,
+    vy: -1 + Math.random() * 2,
+    r: 3 + Math.random() * 3,
+    color: col,
+    life: 1, decay: 0.07 + Math.random() * 0.05,
+  });
+}
+function spawnLaunchBurst() {
+  for (let i = 0; i < 12; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 3 + Math.random() * 5;
+    particles.push({ x: player.screenX, y: player.screenY, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 3, r: 4+Math.random()*3, color:'#64ffda', life:1, decay:0.045+Math.random()*0.04 });
+  }
+}
+function updateParticles() {
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.life -= p.decay; p.r = Math.max(0.5, p.r * 0.97); });
+}
+
+/* =============================================================
+   RENDERING  (mirrors hud.js + canvas rendering)
+   ============================================================= */
+function drawPlayer() {
+  const px = player.screenX, py = player.screenY;
+  const W = C.PLAYER_W, H = C.PLAYER_H;
+
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(player.tilt);
+
+  // Boost glow
+  if (hasBoost('speed') || hasBoost('glide')) {
+    ctx.shadowColor = hasBoost('speed') ? '#ff6d00' : '#64ffda';
+    ctx.shadowBlur  = 16;
+  }
+
+  // Body — glider shape (triangle + wing)
+  ctx.fillStyle = '#00bcd4';
+  ctx.beginPath();
+  ctx.moveTo(W/2, 0);        // nose
+  ctx.lineTo(-W/2, -H/2);    // top-left wing tip
+  ctx.lineTo(-W*0.1, 0);     // fuselage indentation
+  ctx.lineTo(-W/2, H/2);     // bottom-left wing tip
+  ctx.closePath();
+  ctx.fill();
+
+  // Wing highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.moveTo(W/2, 0);
+  ctx.lineTo(-W/4, -H*0.35);
+  ctx.lineTo(-W*0.1, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Tail fin
+  ctx.fillStyle = '#448aff';
+  ctx.beginPath();
+  ctx.moveTo(-W*0.35, 0);
+  ctx.lineTo(-W*0.55, -H*0.65);
+  ctx.lineTo(-W*0.55,  H*0.3);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function drawCollectibles(biome) {
+  const frame = frameCount;
+  collectibles.forEach(c => {
+    if (c.collected) return;
+    const sx = c.x - worldX;
+    if (sx < -40 || sx > canvas.width + 40) return;
+    const bob = Math.sin(frame * 0.06 + c.bobOffset) * 4;
+
+    ctx.save();
+    if (c.type === 'coin') {
+      ctx.fillStyle = '#ffd740';
+      ctx.shadowColor = '#ffd740'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(sx, c.y + bob, 8, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff8'; ctx.beginPath(); ctx.arc(sx-2, c.y+bob-2, 3, 0, Math.PI*2); ctx.fill();
+    } else if (c.type === 'crystal') {
+      ctx.fillStyle = '#e040fb';
+      ctx.shadowColor = '#e040fb'; ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(sx, c.y+bob-12);
+      ctx.lineTo(sx+7, c.y+bob);
+      ctx.lineTo(sx, c.y+bob+8);
+      ctx.lineTo(sx-7, c.y+bob);
+      ctx.closePath(); ctx.fill();
+    } else if (c.type === 'boost_speed') {
+      ctx.fillStyle = '#ff6d00';
+      ctx.shadowColor = '#ff6d00'; ctx.shadowBlur = 12;
+      ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('⚡', sx, c.y + bob);
+    } else if (c.type === 'boost_glide') {
+      ctx.fillStyle = '#64ffda';
+      ctx.shadowColor = '#64ffda'; ctx.shadowBlur = 12;
+      ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🌬', sx, c.y + bob);
+    }
+    ctx.shadowBlur = 0; ctx.restore();
+  });
+}
+
+function drawParticles() {
+  ctx.save();
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha = 1; ctx.restore();
+}
+
+function drawHazardEffect(biome) {
+  if (biome.hazard === 'dust') {
+    // Sand particles drifting right
+    ctx.save();
+    for (let i = 0; i < 5; i++) {
+      const x = ((i * 180 + frameCount * 3) % (canvas.width + 100));
+      const y = canvas.height * 0.3 + (i * 60) % 200;
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#ffa000';
+      ctx.beginPath(); ctx.ellipse(x, y, 18, 5, 0, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+  if (biome.hazard === 'wind') {
+    ctx.save(); ctx.strokeStyle = 'rgba(200,230,255,0.18)'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 4; i++) {
+      const x = ((i * 220 + frameCount * 4) % (canvas.width + 200));
+      const y = 80 + (i * 55) % 220;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 60, y + 10); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function updateSkyMeterUI() {
+  const pct = (player.skyMeter / C.SKY_METER_MAX) * 100;
+  const fill = document.getElementById('skyMeterFill');
+  fill.style.width = pct + '%';
+  fill.classList.toggle('critical', pct < 20);
+}
+
+function render(biome) {
+  drawBackground(worldX, biome);
+  drawHills(worldX, biome);
+  drawHazardEffect(biome);
+  drawCollectibles(biome);
+  drawParticles();
+  drawPlayer();
+  updateSkyMeterUI();
+}
+
+/* =============================================================
+   GAME LOOP
+   ============================================================= */
+let gameActive = false, gamePaused = false;
+let animId = null;
+let lastBiomeIdx = -1;
+
+function gameLoop() {
+  if (!gameActive || gamePaused) return;
+  frameCount++;
+  justReleased = false;  // reset single-frame flag
+
+  const biome = getBiome(distance);
+
+  // Biome change notification
+  const biomeIdx = Math.floor(distance / C.BIOME_DIST) % BIOMES.length;
+  if (biomeIdx !== lastBiomeIdx) {
+    lastBiomeIdx = biomeIdx;
+    showBiomeBadge(biome.name);
+    sfxBiome();
+  }
+
+  // Update
+  updatePlayer(biome);
+  tickBoosts();
+  spawnCollectibles(biome);
+  checkCollectibles(biome);
+  updateParticles();
+
+  // Trail particles (every 2 frames while moving fast)
+  if (frameCount % 2 === 0 && (player.airborne || Math.abs(player.vx) > 4)) {
+    spawnTrailParticle(biome);
+  }
+  if (player.justLaunched) spawnLaunchBurst();
+
+  // Distance in metres
+  distance = Math.floor(worldX / 10);
+
+  // Update HUD
+  document.getElementById('hudDist').textContent  = distance + 'm';
+  document.getElementById('hudCoins').textContent = '🪙 ' + coinsRun + (crystalsRun > 0 ? `  💎 ${crystalsRun}` : '');
+
+  // Sky Meter game over
+  if (player.skyMeter <= 0) { endGame(); return; }
+
+  // Render
+  render(biome);
+
+  animId = requestAnimationFrame(gameLoop);
+}
+
+/* =============================================================
+   BIOME BADGE
+   ============================================================= */
+let biomeTimer = null;
+function showBiomeBadge(name) {
+  const el = document.getElementById('biomeBadge');
+  el.textContent = name;
+  el.style.opacity = '1';
+  clearTimeout(biomeTimer);
+  biomeTimer = setTimeout(() => { el.style.opacity = '0'; }, 2200);
+}
+
+/* =============================================================
+   START / END
+   ============================================================= */
+function startGame() {
+  ensureAudio();
+  gameActive = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+
+  // Apply upgrades before reset so constants are correct
+  applyAllUpgrades();
+
+  worldX = 0; distance = 0; frameCount = 0;
+  coinsRun = 0; crystalsRun = 0;
+  collectibles = []; particles = []; nextCollX = 300;
+  lastBiomeIdx = -1;
+
+  resetPlayer();
+  showScreen(null);
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('skyMeterWrap').classList.remove('hidden');
+
+  gameActive = true; gamePaused = false;
+  startMusic();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  if (!gameActive) return;
+  gameActive = false;
+  stopMusic(); sfxGameOver();
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+
+  // Save progress
+  saveData.coins    += coinsRun;
+  saveData.crystals += crystalsRun;
+  const isNew = distance > saveData.bestDistance;
+  if (isNew) saveData.bestDistance = distance;
+  persistSave();
+
+  // Also store in shared Scores
+  if (typeof Scores !== 'undefined') Scores.set('sky-slope', distance);
+
+  showScreen('gameoverScreen');
+  document.getElementById('goDist').textContent    = distance + 'm';
+  document.getElementById('goSub').textContent     = 'Best: ' + saveData.bestDistance + 'm';
+  document.getElementById('newRecordBadge').classList.toggle('hidden', !isNew);
+  document.getElementById('goCoins').textContent   = coinsRun;
+  document.getElementById('goCrystals').textContent= crystalsRun;
+  document.getElementById('goLaunches').textContent= player.launches;
+  refreshStartStats();
+}
+
+function pauseGame() {
+  if (!gameActive || gamePaused) return;
+  gamePaused = true;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  stopMusic();
+  document.getElementById('pauseScreen').classList.remove('hidden');
+}
+
+function resumeGame() {
+  if (!gameActive) return;
+  gamePaused = false;
+  document.getElementById('pauseScreen').classList.add('hidden');
+  startMusic();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+/* =============================================================
+   SCREENS  (mirrors menu.js)
+   ============================================================= */
+const SCREEN_IDS = ['startScreen','pauseScreen','gameoverScreen','shopScreen','settingsScreen'];
+let settingsFrom = 'startScreen';
+
+function showScreen(id) {
+  SCREEN_IDS.forEach(s => document.getElementById(s).classList.add('hidden'));
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('skyMeterWrap').classList.add('hidden');
+  if (id) document.getElementById(id).classList.remove('hidden');
+}
+
+function refreshStartStats() {
+  document.getElementById('bestDist').textContent     = saveData.bestDistance + 'm';
+  document.getElementById('totalCoins').textContent   = saveData.coins;
+  document.getElementById('totalCrystals').textContent= saveData.crystals;
+}
+
+/* =============================================================
+   UPGRADE SHOP  (mirrors shop.js)
+   ============================================================= */
+function buildShop() {
+  document.getElementById('shopCoins').textContent    = saveData.coins;
+  document.getElementById('shopCrystals').textContent = saveData.crystals;
+
+  const list = document.getElementById('upgradeList');
+  list.innerHTML = '';
+  let lastCat = '';
+
+  UPGRADES.forEach(u => {
+    if (u.cat !== lastCat) {
+      lastCat = u.cat;
+      const catEl = document.createElement('div');
+      catEl.className = 'upg-category'; catEl.textContent = u.cat;
+      list.appendChild(catEl);
+    }
+
+    const level   = getUpg(u.id);
+    const maxed   = level >= u.maxLevel;
+    const coinCost    = maxed ? 0 : u.costCoins[level];
+    const crystalCost = maxed ? 0 : (u.costCrystals[level] || 0);
+    const canAfford   = !maxed && saveData.coins >= coinCost && saveData.crystals >= crystalCost;
+
+    const card = document.createElement('div');
+    card.className = `upgrade-card${maxed ? ' maxed' : ''}`;
+
+    const costLabel = maxed ? 'MAX' : `🪙${coinCost}${crystalCost > 0 ? ` 💎${crystalCost}` : ''}`;
+
+    card.innerHTML = `
+      <div class="upg-info">
+        <div class="upg-name">${u.name}</div>
+        <div class="upg-desc">${u.desc}</div>
+        <div class="upg-level">Level ${level} / ${u.maxLevel}</div>
+      </div>
+      <button class="upg-buy" ${(!canAfford || maxed) ? 'disabled' : ''}>${costLabel}</button>`;
+
+    if (canAfford && !maxed) {
+      card.querySelector('.upg-buy').addEventListener('click', () => {
+        saveData.coins    -= coinCost;
+        saveData.crystals -= crystalCost;
+        saveData.upgrades[u.id] = level + 1;
+        persistSave();
+        buildShop();
+      });
+    }
+    list.appendChild(card);
+  });
+}
+
+/* =============================================================
+   WIRE UP BUTTONS
+   ============================================================= */
+document.getElementById('playBtn').addEventListener('click', () => startGame());
+document.getElementById('playAgainBtn').addEventListener('click', () => startGame());
+document.getElementById('goShopBtn').addEventListener('click', () => { buildShop(); showScreen('shopScreen'); });
+document.getElementById('goMenuBtn').addEventListener('click', () => { showScreen('startScreen'); refreshStartStats(); });
+document.getElementById('menuBtn')?.addEventListener('click', () => { showScreen('startScreen'); refreshStartStats(); });
+document.getElementById('shopBtn').addEventListener('click', () => { buildShop(); showScreen('shopScreen'); });
+document.getElementById('shopBackBtn').addEventListener('click', () => showScreen('startScreen'));
+document.getElementById('settingsBtn').addEventListener('click', () => { settingsFrom = 'startScreen'; showScreen('settingsScreen'); });
+document.getElementById('settingsBackBtn').addEventListener('click', () => showScreen(settingsFrom));
+document.getElementById('muteBtn').addEventListener('click', toggleMute);
+document.getElementById('pauseBtn').addEventListener('click', () => pauseGame());
+document.getElementById('resumeBtn').addEventListener('click', () => resumeGame());
+document.getElementById('pauseRestartBtn').addEventListener('click', () => startGame());
+document.getElementById('pauseMenuBtn').addEventListener('click', () => { gameActive = false; stopMusic(); showScreen('startScreen'); refreshStartStats(); });
+document.getElementById('musicVol').addEventListener('input', e => setMusicVol(+e.target.value));
+document.getElementById('sfxVol').addEventListener('input',   e => { setSfxVol(+e.target.value); ensureAudio(); });
+
+/* =============================================================
+   INIT
+   ============================================================= */
+function init() {
+  document.getElementById('musicVol').value = saveData.settings.musicVol;
+  document.getElementById('sfxVol').value   = saveData.settings.sfxVol;
+  applyAllUpgrades();
+  refreshStartStats();
+  // Draw initial background frame
+  const biome = getBiome(0);
+  drawBackground(0, biome);
+  drawHills(0, biome);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+
+
+
+
+</script>
+</body>
+</html>

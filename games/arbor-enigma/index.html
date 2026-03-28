@@ -1,0 +1,2406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Arbor Enigma – Airplane Games</title>
+  <base href="/Airplane-Games/">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="js/shared.js" defer></script>
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       ARBOR ENIGMA — styles
+       Palette: deep forest greens, cream parchment, gold accents
+       Typeface: system serif stack for an ancient-book feel
+    ═══════════════════════════════════════════════════════ */
+
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0f1a0f;
+    }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      color: #e8dfc0;
+      touch-action: none;
+      user-select: none; -webkit-user-select: none;
+    }
+
+    /* ── Canvas (puzzle rendering layer) ───────────────── */
+    #puzzleCanvas {
+      display: block;
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100dvh;
+      /* Hidden until puzzle screen is active */
+    }
+
+    /* ══════════════════════════════════════════════════════
+       SCREENS
+    ══════════════════════════════════════════════════════ */
+    .screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 28px 22px;
+      background: rgba(15, 26, 15, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .screen.hidden { display: none; }
+
+    /* ── Title ─────────────────────────────────────────── */
+    .game-title {
+      font-size: clamp(2rem, 8vw, 3.2rem);
+      font-weight: 700;
+      font-style: italic;
+      letter-spacing: 2px;
+      background: linear-gradient(160deg, #c9a84c 0%, #e8dfc0 50%, #c9a84c 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+    .game-subtitle {
+      font-size: 0.82rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #7a9e6e;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+    .divider {
+      width: 120px; height: 1px;
+      background: linear-gradient(90deg, transparent, #c9a84c, transparent);
+      margin: 16px 0;
+    }
+
+    /* ── Buttons ───────────────────────────────────────── */
+    .btn {
+      display: block; width: 100%; max-width: 280px;
+      padding: 13px 22px; margin: 6px 0;
+      border: none; border-radius: 4px;
+      font-size: 0.95rem; font-weight: 700;
+      font-family: inherit;
+      cursor: pointer; text-align: center; text-decoration: none;
+      letter-spacing: 1px;
+      transition: transform 0.1s, opacity 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: linear-gradient(135deg, #2d5a1b, #4a8a2e);
+      color: #e8dfc0;
+      border: 1px solid #7a9e6e;
+      box-shadow: 0 3px 14px rgba(74,138,46,0.3);
+    }
+    .btn-secondary {
+      background: rgba(232, 223, 192, 0.08);
+      color: #e8dfc0;
+      border: 1px solid rgba(232, 223, 192, 0.2);
+    }
+    .btn-gold {
+      background: linear-gradient(135deg, #8a6a1b, #c9a84c);
+      color: #1a1a0a;
+      font-weight: 800;
+      box-shadow: 0 3px 14px rgba(201,168,76,0.3);
+    }
+
+    /* ── Start screen extras ───────────────────────────── */
+    .start-progress {
+      display: flex; gap: 8px; margin-bottom: 22px;
+    }
+    .start-prog-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: rgba(201,168,76,0.2);
+      border: 1px solid rgba(201,168,76,0.4);
+      transition: background 0.3s;
+    }
+    .start-prog-dot.done { background: #c9a84c; }
+
+    /* ══════════════════════════════════════════════════════
+       CHAPTER SELECT SCREEN
+    ══════════════════════════════════════════════════════ */
+    .chapter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%; max-width: 360px;
+      margin-bottom: 18px;
+    }
+    .chapter-card {
+      position: relative;
+      background: rgba(232,223,192,0.05);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: 8px;
+      padding: 16px 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s, border-color 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chapter-card:active { transform: scale(0.97); }
+    .chapter-card.locked {
+      opacity: 0.4;
+      cursor: default;
+      pointer-events: none;
+    }
+    .chapter-card.active {
+      border-color: #c9a84c;
+      background: rgba(201,168,76,0.1);
+    }
+    .chapter-card.complete {
+      border-color: #4a8a2e;
+      background: rgba(74,138,46,0.1);
+    }
+    .chapter-icon  { font-size: 2rem; margin-bottom: 6px; display: block; }
+    .chapter-name  { font-size: 0.88rem; font-weight: 700; color: #e8dfc0; margin-bottom: 3px; }
+    .chapter-sub   { font-size: 0.72rem; color: #7a9e6e; margin-bottom: 6px; }
+    .chapter-prog  { font-size: 0.7rem; color: #c9a84c; }
+    .chapter-lock  { position: absolute; top: 8px; right: 10px; font-size: 0.8rem; opacity: 0.5; }
+
+    /* ══════════════════════════════════════════════════════
+       PUZZLE SCREEN (overlay on top of canvas)
+    ══════════════════════════════════════════════════════ */
+    #puzzleScreen {
+      /* Semi-transparent — canvas shows through bottom portion */
+      background: transparent;
+      pointer-events: none; /* children handle events individually */
+      justify-content: flex-end;
+      padding: 0;
+    }
+    #puzzleScreen.hidden { display: none; }
+
+    /* ── Puzzle top bar ────────────────────────────────── */
+    #puzzleTopBar {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 25; pointer-events: auto;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px;
+      background: linear-gradient(180deg, rgba(15,26,15,0.92) 0%, transparent 100%);
+    }
+    .puzzle-nav-btn {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(232,223,192,0.2);
+      color: #e8dfc0; border-radius: 50%;
+      width: 38px; height: 38px;
+      font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .puzzle-chapter-label {
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #7a9e6e;
+    }
+    #puzzleCounter {
+      font-size: 0.8rem; color: #c9a84c;
+    }
+
+    /* ── Answer display strip ──────────────────────────── */
+    #answerStrip {
+      position: fixed;
+      bottom: 260px; left: 50%; transform: translateX(-50%);
+      z-index: 25; pointer-events: none;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .answer-box {
+      width: 34px; height: 42px;
+      border-bottom: 2px solid #c9a84c;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 4px;
+      font-size: 1.4rem; font-weight: 700;
+      color: #e8dfc0;
+      letter-spacing: 0;
+      transition: color 0.2s;
+    }
+    .answer-box.filled { color: #c9a84c; }
+    .answer-box.wrong  { border-bottom-color: #e53935; color: #e53935; animation: shakeX 0.4s; }
+    .answer-box.correct{ border-bottom-color: #4a8a2e; color: #4a8a2e; }
+
+    .answer-box.shake    { animation: shakeX 0.5s; }
+    .answer-box.glow     { border-bottom-color: #c9a84c; color: #c9a84c; animation: glowPulse 0.6s; }
+    .answer-box.revealed { color: #7a9e6e; border-bottom-color: #7a9e6e; font-style: italic; }
+
+    @keyframes shakeX {
+      0%,100%{ transform: translateX(0); }
+      20%    { transform: translateX(-5px); }
+      40%    { transform: translateX(5px); }
+      60%    { transform: translateX(-4px); }
+      80%    { transform: translateX(4px); }
+    }
+    @keyframes glowPulse {
+      0%   { text-shadow: 0 0 0px #c9a84c; }
+      50%  { text-shadow: 0 0 12px #c9a84c; }
+      100% { text-shadow: 0 0 4px #c9a84c; }
+    }
+
+    /* ── Progress dots ─────────────────────────────────── */
+    .progress-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(232,223,192,0.2);
+      border: 1px solid rgba(201,168,76,0.4);
+      transition: background 0.3s;
+    }
+    .progress-dot.solved  { background: #7a9e6e; border-color: #7a9e6e; }
+    .progress-dot.current { background: #c9a84c; border-color: #c9a84c; }
+
+    /* ── Hint text ─────────────────────────────────────── */
+    #hintArea {
+      position: fixed;
+      bottom: 308px; left: 50%; transform: translateX(-50%);
+      z-index: 25; pointer-events: none;
+      text-align: center;
+      font-size: 0.78rem; color: #7a9e6e;
+      font-style: italic;
+      max-width: 280px;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    #hintArea.visible { opacity: 1; }
+
+    /* ── Hint button ───────────────────────────────────── */
+    #hintBtn {
+      position: fixed;
+      bottom: 308px; right: 16px;
+      z-index: 25; pointer-events: auto;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(201,168,76,0.3);
+      color: #c9a84c; border-radius: 20px;
+      padding: 5px 12px; font-size: 0.75rem;
+      cursor: pointer; font-family: inherit;
+      letter-spacing: 1px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #hintBtn.cooling { opacity: 0.4; pointer-events: none; }
+
+    /* ══════════════════════════════════════════════════════
+       KEYPAD
+    ══════════════════════════════════════════════════════ */
+    #keypad {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 25; pointer-events: auto;
+      background: linear-gradient(0deg, rgba(10,18,10,0.98) 0%, rgba(15,26,15,0.92) 100%);
+      border-top: 1px solid rgba(201,168,76,0.2);
+      padding: 10px 10px 20px;
+      /* Safe-area for notched devices */
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+    }
+
+    .keypad-row {
+      display: flex; justify-content: center;
+      gap: 5px; margin-bottom: 5px;
+    }
+    .key {
+      flex: 0 0 auto;
+      width: 32px; height: 38px;
+      background: rgba(232,223,192,0.07);
+      border: 1px solid rgba(232,223,192,0.15);
+      border-radius: 5px;
+      color: #e8dfc0;
+      font-family: inherit;
+      font-size: 0.85rem; font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s, transform 0.08s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .key:active {
+      background: rgba(201,168,76,0.25);
+      transform: scale(0.92);
+    }
+    .key-backspace {
+      width: 48px;
+      font-size: 1rem;
+      color: #c9a84c;
+      border-color: rgba(201,168,76,0.25);
+    }
+    .key-submit {
+      width: 64px;
+      background: rgba(74,138,46,0.2);
+      border-color: rgba(74,138,46,0.4);
+      color: #7a9e6e;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+    }
+    .key-submit.ready {
+      background: linear-gradient(135deg, rgba(45,90,27,0.8), rgba(74,138,46,0.8));
+      border-color: #4a8a2e;
+      color: #e8dfc0;
+      box-shadow: 0 2px 10px rgba(74,138,46,0.3);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PUZZLE SOLVED OVERLAY
+    ══════════════════════════════════════════════════════ */
+    #solvedOverlay {
+      position: fixed; inset: 0; z-index: 40;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(10, 18, 10, 0.88);
+      backdrop-filter: blur(8px);
+      animation: fadeInOverlay 0.4s ease-out;
+    }
+    #solvedOverlay.hidden { display: none; }
+    @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+
+    .solved-word {
+      font-size: clamp(2.2rem, 10vw, 3.5rem);
+      font-weight: 700; font-style: italic;
+      color: #c9a84c;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+      animation: wordReveal 0.6s cubic-bezier(0.16,1,0.3,1);
+    }
+    @keyframes wordReveal {
+      from { opacity: 0; transform: scale(0.6) translateY(20px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .solved-label {
+      font-size: 0.75rem; letter-spacing: 3px;
+      text-transform: uppercase; color: #7a9e6e;
+      margin-bottom: 32px;
+    }
+    .solved-stars {
+      font-size: 2rem; letter-spacing: 8px;
+      margin-bottom: 28px;
+      animation: starsIn 0.5s 0.3s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    @keyframes starsIn {
+      from { opacity: 0; transform: scale(0.4); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CHAPTER COMPLETE OVERLAY
+    ══════════════════════════════════════════════════════ */
+    #chapterCompleteOverlay {
+      position: fixed; inset: 0; z-index: 42;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(10,18,10,0.95);
+      backdrop-filter: blur(14px);
+      padding: 28px;
+    }
+    #chapterCompleteOverlay.hidden { display: none; }
+
+    .cc-icon  { font-size: 3.5rem; margin-bottom: 12px; animation: dropIn 0.5s cubic-bezier(0.16,1,0.3,1); }
+    .cc-title { font-size: 1.6rem; font-weight: 700; font-style: italic; color: #c9a84c; margin-bottom: 4px; }
+    .cc-sub   { font-size: 0.78rem; letter-spacing: 2px; text-transform: uppercase; color: #7a9e6e; margin-bottom: 28px; }
+    @keyframes dropIn { from { opacity:0; transform:translateY(-30px); } to { opacity:1; transform:translateY(0); } }
+
+    /* ══════════════════════════════════════════════════════
+       SETTINGS SCREEN
+    ══════════════════════════════════════════════════════ */
+    .settings-group { width: 100%; max-width: 280px; margin-bottom: 18px; }
+    .settings-label { color: #7a9e6e; font-size: 0.78rem; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; display: block; }
+    .slider { width: 100%; height: 5px; accent-color: #c9a84c; cursor: pointer; }
+
+    /* ══════════════════════════════════════════════════════
+       DECORATIVE ELEMENTS
+    ══════════════════════════════════════════════════════ */
+    .leaf-deco {
+      position: absolute;
+      font-size: 1.2rem;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PUZZLE TYPE LABELS (shown at top of puzzle area)
+    ══════════════════════════════════════════════════════ */
+    #puzzleTypeLabel {
+      position: fixed;
+      top: 60px; left: 50%; transform: translateX(-50%);
+      z-index: 24;
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(122,158,110,0.7);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── Puzzle instruction text ─────────────────────── */
+    #puzzleInstruction {
+      position: fixed;
+      top: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 24;
+      font-size: 0.78rem;
+      color: rgba(232,223,192,0.55);
+      font-style: italic;
+      pointer-events: none;
+      text-align: center;
+      max-width: 260px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       FLOATING PARTICLE CANVAS (solve burst effect)
+    ══════════════════════════════════════════════════════ */
+    #fxCanvas {
+      position: fixed; inset: 0; z-index: 39;
+      pointer-events: none;
+      width: 100%; height: 100dvh;
+    }
+    #fxCanvas.hidden { display: none; }
+
+    /* ══════════════════════════════════════════════════════
+       SCROLL WRAP (for screens with overflow)
+    ══════════════════════════════════════════════════════ */
+    .scroll-wrap {
+      overflow-y: auto; max-height: 70vh;
+      width: 100%; display: flex;
+      flex-direction: column; align-items: center;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       UTILITY
+    ══════════════════════════════════════════════════════ */
+    .section-title {
+      font-size: 1.2rem; font-weight: 700; font-style: italic;
+      color: #c9a84c; letter-spacing: 1px;
+      margin-bottom: 16px; text-align: center;
+    }
+    .text-muted { color: #7a9e6e; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     CANVAS LAYERS
+═══════════════════════════════════════════════════════ -->
+<canvas id="puzzleCanvas"></canvas>
+<canvas id="fxCanvas"></canvas>
+
+<!-- ═══════════════════════════════════════════════════════
+     TITLE SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="titleScreen" class="screen">
+  <span class="leaf-deco" style="top:8%;left:10%">🍃</span>
+  <span class="leaf-deco" style="top:12%;right:8%">🌿</span>
+  <span class="leaf-deco" style="bottom:20%;left:6%">🍂</span>
+  <span class="leaf-deco" style="bottom:15%;right:10%">🍃</span>
+
+  <div class="game-title">Arbor Enigma</div>
+  <div class="game-subtitle">Hidden Puzzles of the Ancient Grove</div>
+  <div class="divider"></div>
+
+  <!-- Overall progress badge -->
+  <div id="titleProgressBadge" style="font-size:0.75rem;color:#7a9e6e;margin-bottom:16px;letter-spacing:1px;min-height:1.1em;"></div>
+
+  <button class="btn btn-primary" id="titlePlayBtn">Begin Journey</button>
+  <button class="btn btn-secondary" id="titleChaptersBtn">Select Chapter</button>
+  <button class="btn btn-secondary" id="titleSettingsBtn">⚙ Settings</button>
+  <a href="../../" class="btn btn-secondary">🏠 Back to Hub</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPTER SELECT SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="chapterScreen" class="screen hidden">
+  <div class="section-title">Choose a Chapter</div>
+  <div class="chapter-grid" id="chapterGrid">
+    <!-- Populated by JS -->
+  </div>
+  <button class="btn btn-secondary" id="chapterBackBtn" style="max-width:200px">← Back</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     PUZZLE SCREEN (transparent — canvas shows through)
+═══════════════════════════════════════════════════════ -->
+<div id="puzzleScreen" class="screen hidden">
+
+  <!-- Top bar -->
+  <div id="puzzleTopBar">
+    <button class="puzzle-nav-btn" id="puzzleBackBtn" aria-label="Back">←</button>
+    <div style="text-align:center">
+      <div class="puzzle-chapter-label" id="puzzleChapterLabel">Chapter I</div>
+      <div id="puzzleCounter" style="font-size:0.7rem;color:#c9a84c">1 / 6</div>
+    </div>
+    <button class="puzzle-nav-btn" id="puzzleMuteBtn" aria-label="Mute">🔊</button>
+  </div>
+
+  <!-- Puzzle type + instruction -->
+  <div id="puzzleTypeLabel">— eclipse —</div>
+  <div id="puzzleInstruction">Drag the circles until the letter reveals itself</div>
+
+  <!-- Progress dots + hint bar -->
+  <div id="progressDots" style="display:flex;gap:5px;justify-content:center;margin:6px 0 4px;"></div>
+  <div id="hintTrack" style="width:min(220px,60vw);height:3px;background:rgba(232,223,192,0.12);border-radius:2px;margin:0 auto 4px;">
+    <div id="hintBar" style="height:100%;width:100%;background:#c9a84c;border-radius:2px;transition:width 1s linear;"></div>
+  </div>
+  <div id="hintLabel" style="font-size:0.68rem;color:#c9a84c;text-align:center;min-height:1.1em;margin-bottom:2px;"></div>
+
+  <!-- Answer strip (blank boxes, one per letter) -->
+  <div id="answerStrip">
+    <!-- Populated per-puzzle by JS -->
+  </div>
+
+  <!-- Keypad -->
+  <div id="keypad">
+    <!-- Row 1: Q W E R T Y U I O P -->
+    <div class="keypad-row" id="keyRow1"></div>
+    <!-- Row 2: A S D F G H J K L -->
+    <div class="keypad-row" id="keyRow2"></div>
+    <!-- Row 3: ← Z X C V B N M ✓ -->
+    <div class="keypad-row" id="keyRow3"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SOLVED OVERLAY
+═══════════════════════════════════════════════════════ -->
+<div id="solvedOverlay" class="hidden">
+  <div class="solved-stars" id="solvedStars">✦ ✦ ✦</div>
+  <div class="solved-word" id="solvedWord">TREE</div>
+  <div class="solved-label">Revealed</div>
+  <button class="btn btn-gold" id="solvedNextBtn" style="margin-top:8px">Next Puzzle →</button>
+  <button class="btn btn-secondary" id="solvedMenuBtn" style="margin-top:6px;max-width:200px">Chapter Map</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     CHAPTER COMPLETE OVERLAY
+═══════════════════════════════════════════════════════ -->
+<div id="chapterCompleteOverlay" class="hidden">
+  <div class="cc-icon" id="ccIcon">🌿</div>
+  <div class="cc-title" id="ccTitle">Chapter Complete</div>
+  <div class="cc-sub"  id="ccSub">The Clearing is revealed</div>
+  <div class="divider"></div>
+  <button class="btn btn-gold"      id="ccNextBtn"  style="margin-top:20px">Next Chapter →</button>
+  <button class="btn btn-secondary" id="ccMenuBtn"  style="margin-top:8px;max-width:200px">Chapter Map</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SETTINGS SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="settingsScreen" class="screen hidden">
+  <div class="section-title">Settings</div>
+  <div class="scroll-wrap">
+    <div class="settings-group">
+      <label class="settings-label">🎵 Music Volume</label>
+      <input type="range" class="slider" id="musicVol" min="0" max="100" value="40">
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">🔔 Sound Effects</label>
+      <input type="range" class="slider" id="sfxVol" min="0" max="100" value="70">
+    </div>
+    <div class="settings-group" style="text-align:center">
+      <label class="settings-label">Progress</label>
+      <span class="text-muted" id="settingsProgress">0 / 24 puzzles solved</span>
+      <br><br>
+      <button class="btn btn-secondary" id="resetProgressBtn"
+        style="max-width:200px;font-size:0.8rem;padding:9px 16px">
+        Reset All Progress
+      </button>
+    </div>
+  </div>
+  <button class="btn btn-secondary" id="settingsBackBtn" style="margin-top:16px;max-width:200px">← Back</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCRIPTS  (engine injected in next phases)
+═══════════════════════════════════════════════════════ -->
+<script>
+/* =============================================================
+   ARBOR ENIGMA  —  main script
+   Phase 1: Canvas setup + keypad build + screen routing stubs
+   (engine + puzzle types added in phases 2–8)
+   ============================================================= */
+
+'use strict';
+
+// ── Canvas references ──────────────────────────────────────
+const pCanvas = document.getElementById('puzzleCanvas');
+const pCtx    = pCanvas.getContext('2d');
+const fCanvas = document.getElementById('fxCanvas');
+const fCtx    = fCanvas.getContext('2d');
+
+function resizeCanvases() {
+  pCanvas.width  = window.innerWidth;
+  pCanvas.height = window.innerHeight;
+  fCanvas.width  = window.innerWidth;
+  fCanvas.height = window.innerHeight;
+}
+resizeCanvases();
+window.addEventListener('resize', () => { resizeCanvases(); if (typeof onResize === 'function') onResize(); });
+
+// ── Screen routing helpers ─────────────────────────────────
+const SCREEN_IDS = ['titleScreen','chapterScreen','puzzleScreen','settingsScreen'];
+
+function showScreen(id) {
+  SCREEN_IDS.forEach(s => document.getElementById(s).classList.add('hidden'));
+  document.getElementById('solvedOverlay').classList.add('hidden');
+  document.getElementById('chapterCompleteOverlay').classList.add('hidden');
+  if (id) document.getElementById(id).classList.remove('hidden');
+}
+
+// ── Keypad build ───────────────────────────────────────────
+// QWERTY layout matching HER TREES feel
+const ROWS = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L'],
+  ['⌫','Z','X','C','V','B','N','M','✓'],
+];
+
+function buildKeypad() {
+  ROWS.forEach((row, ri) => {
+    const rowEl = document.getElementById(`keyRow${ri + 1}`);
+    rowEl.innerHTML = '';
+    row.forEach(char => {
+      const btn = document.createElement('button');
+      btn.className = 'key';
+      btn.textContent = char;
+      btn.dataset.key  = char;
+      if (char === '⌫') btn.classList.add('key-backspace');
+      if (char === '✓') { btn.classList.add('key-submit'); btn.id = 'keySubmit'; }
+      btn.addEventListener('click', () => onKeyPress(char));
+      // Prevent double-firing on touch
+      btn.addEventListener('touchstart', e => { e.preventDefault(); onKeyPress(char); }, { passive: false });
+      rowEl.appendChild(btn);
+    });
+  });
+}
+buildKeypad();
+
+// ── Answer strip builder ───────────────────────────────────
+function buildAnswerStrip(length) {
+  const strip = document.getElementById('answerStrip');
+  strip.innerHTML = '';
+  for (let i = 0; i < length; i++) {
+    const box = document.createElement('div');
+    box.className = 'answer-box';
+    box.id = `abox${i}`;
+    strip.appendChild(box);
+  }
+}
+
+// ── Keypad input state ─────────────────────────────────────
+// (wired up properly in Phase 2 engine)
+function onKeyPress(char) {
+  if (typeof handleKeyPress === 'function') handleKeyPress(char);
+}
+
+// ── Init stubs (replaced in Phase 2) ──────────────────────
+function init() {
+  buildKeypad();
+  if (typeof engineInit === 'function') engineInit();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+
+/* =============================================================
+   PHASE 2 — Core Engine
+   Audio · Save/Progress · State Machine · Level Loader ·
+   Answer Checking · Hint System · Screen Init
+   ============================================================= */
+
+// ── Audio System ───────────────────────────────────────────
+let _audioCtx = null;
+function getAudio() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+function ensureAudio() {
+  const ac = getAudio();
+  if (ac.state === 'suspended') ac.resume();
+}
+
+// Forest ambient background (layered sine drones)
+let _ambGain = null, _ambOscs = [];
+function startAmbient() {
+  const ac = getAudio();
+  if (_ambGain) return;
+  _ambGain = ac.createGain(); _ambGain.gain.value = 0.06;
+  const rev = ac.createConvolver();
+  // tiny impulse reverb
+  const len = ac.sampleRate * 1.5;
+  const imp = ac.createBuffer(2, len, ac.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = imp.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  }
+  rev.buffer = imp;
+  _ambGain.connect(rev); rev.connect(ac.destination);
+  _ambGain.connect(ac.destination);
+  [[110,0.03],[165,0.02],[220,0.015],[330,0.01]].forEach(([freq, vol]) => {
+    const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+    const g = ac.createGain(); g.gain.value = vol;
+    o.connect(g); g.connect(_ambGain); o.start();
+    _ambOscs.push(o);
+  });
+}
+function stopAmbient() {
+  _ambOscs.forEach(o => { try { o.stop(); } catch {} });
+  _ambOscs = [];
+  if (_ambGain) { _ambGain.disconnect(); _ambGain = null; }
+}
+
+function sfxKey() {
+  const ac = getAudio();
+  const o = ac.createOscillator(); const g = ac.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(880, ac.currentTime);
+  o.frequency.exponentialRampToValueAtTime(660, ac.currentTime + 0.06);
+  g.gain.setValueAtTime(0.18, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
+  o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.12);
+}
+function sfxBackspace() {
+  const ac = getAudio();
+  const o = ac.createOscillator(); const g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = 330;
+  g.gain.setValueAtTime(0.12, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08);
+  o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.1);
+}
+function sfxWrong() {
+  const ac = getAudio();
+  [220, 200].forEach((f, i) => {
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.type = 'sawtooth'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, ac.currentTime + i * 0.1);
+    g.gain.linearRampToValueAtTime(0.15, ac.currentTime + i * 0.1 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.1 + 0.18);
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + i * 0.1 + 0.2);
+  });
+}
+function sfxSolve() {
+  const ac = getAudio();
+  [523, 659, 784, 1047].forEach((f, i) => {
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, ac.currentTime + i * 0.11);
+    g.gain.linearRampToValueAtTime(0.22, ac.currentTime + i * 0.11 + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.11 + 0.35);
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + i * 0.11 + 0.38);
+  });
+}
+function sfxHint() {
+  const ac = getAudio();
+  const o = ac.createOscillator(); const g = ac.createGain();
+  o.type = 'triangle'; o.frequency.value = 660;
+  g.gain.setValueAtTime(0.15, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.4);
+  o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.45);
+}
+function sfxChapterComplete() {
+  const ac = getAudio();
+  const freqs = [523,659,784,880,1047,1175,1319];
+  freqs.forEach((f, i) => {
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, ac.currentTime + i * 0.09);
+    g.gain.linearRampToValueAtTime(0.18, ac.currentTime + i * 0.09 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.09 + 0.5);
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + i * 0.09 + 0.55);
+  });
+}
+
+// ── Save / Progress ────────────────────────────────────────
+const SAVE_KEY = 'ag_arbor_enigma';
+let save = { solvedIds: [], unlockedChapters: ['ch1'], settings: { sfx: true, ambient: true } };
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      save = Object.assign(save, parsed);
+    }
+  } catch {}
+}
+function persistSave() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {}
+}
+function isPuzzleSolved(id) { return save.solvedIds.includes(id); }
+function markSolved(id) {
+  if (!isPuzzleSolved(id)) { save.solvedIds.push(id); persistSave(); }
+}
+function unlockChapter(chId) {
+  if (!save.unlockedChapters.includes(chId)) { save.unlockedChapters.push(chId); persistSave(); }
+}
+function resetProgress() {
+  save = { solvedIds: [], unlockedChapters: ['ch1'], settings: save.settings };
+  persistSave();
+}
+
+// ── LEVELS DATA ────────────────────────────────────────────
+// (populated incrementally in phases 3–8; stubs here)
+const CHAPTERS = [
+  { id: 'ch1', title: 'The Seedling',  icon: '🌱', color: '#4a8a2e', puzzles: [] },
+  { id: 'ch2', title: 'The Canopy',    icon: '🌳', color: '#2e7a8a', puzzles: [] },
+  { id: 'ch3', title: 'The Roots',     icon: '🍂', color: '#8a5c2e', puzzles: [] },
+  { id: 'ch4', title: 'The Bloom',     icon: '🌸', color: '#8a2e6e', puzzles: [] },
+];
+
+// Puzzle types: ECLIPSE | PATHWAY | PIXEL | SCATTER | CIPHER | SEQUENCE
+// Each puzzle: { id, type, answer, hint?, data:{...} }
+
+// ── Game State Machine ─────────────────────────────────────
+let state = {
+  screen: 'title',       // 'title' | 'chapter' | 'puzzle' | 'settings'
+  chapterIdx: 0,         // index into CHAPTERS
+  puzzleIdx: 0,          // index into chapter.puzzles
+  puzzle: null,          // current puzzle object
+  input: [],             // array of entered chars
+  hintRevealed: [],      // indices of revealed hint chars
+  hintTimer: null,
+  hintSecondsLeft: 90,
+  hintCountdown: null,
+  solvedAnim: false,
+  wrongAnim: false,
+  wrongTimer: null,
+};
+
+// ── Level Loader ───────────────────────────────────────────
+function loadPuzzle(chapterIdx, puzzleIdx) {
+  const chapter = CHAPTERS[chapterIdx];
+  if (!chapter) return;
+  const puzzle  = chapter.puzzles[puzzleIdx];
+  if (!puzzle) return;
+
+  state.chapterIdx = chapterIdx;
+  state.puzzleIdx  = puzzleIdx;
+  state.puzzle     = puzzle;
+  state.input      = [];
+  state.hintRevealed = [];
+  state.solvedAnim   = false;
+  state.wrongAnim    = false;
+  clearTimeout(state.wrongTimer);
+  clearInterval(state.hintCountdown);
+
+  // Build answer strip
+  buildAnswerStrip(puzzle.answer.length);
+
+  // Update puzzle title/type labels
+  const typeLabel = { ECLIPSE:'Eclipse', PATHWAY:'Pathway', PIXEL:'Pixel Art',
+                      SCATTER:'Scatter', CIPHER:'Cipher', SEQUENCE:'Sequence' };
+  document.getElementById('puzzleChapterLabel').textContent = chapter.title;
+  document.getElementById('puzzleCounter').textContent      = (puzzleIdx + 1) + ' / ' + chapter.puzzles.length;
+  document.getElementById('puzzleTypeLabel').textContent    = typeLabel[puzzle.type] || puzzle.type;
+
+  // Update progress dots
+  const dotsEl = document.getElementById('progressDots');
+  if (dotsEl) {
+    dotsEl.innerHTML = '';
+    chapter.puzzles.forEach((p, i) => {
+      const dot = document.createElement('div');
+      dot.className = 'progress-dot' + (isPuzzleSolved(p.id) ? ' solved' : '') + (i === puzzleIdx ? ' current' : '');
+      dotsEl.appendChild(dot);
+    });
+  }
+
+  // Hint bar
+  state.hintSecondsLeft = 90;
+  const hintBarEl   = document.getElementById('hintBar');
+  const hintLabelEl = document.getElementById('hintLabel');
+  if (hintBarEl) hintBarEl.style.width = '100%';
+  if (hintLabelEl) hintLabelEl.textContent = '';
+  state.hintCountdown = setInterval(() => {
+    state.hintSecondsLeft--;
+    const pct = Math.max(0, state.hintSecondsLeft / 90 * 100);
+    if (hintBarEl) hintBarEl.style.width = pct + '%';
+    if (state.hintSecondsLeft <= 0) {
+      clearInterval(state.hintCountdown);
+      triggerHint();
+    }
+  }, 1000);
+
+  // Show puzzle screen
+  showScreen('puzzleScreen');
+
+  // Dispatch to puzzle renderer (defined in phase 3+)
+  if (typeof renderPuzzle === 'function') renderPuzzle(puzzle);
+}
+
+// ── Answer Checking ────────────────────────────────────────
+function handleKeyPress(char) {
+  if (!state.puzzle) return;
+  ensureAudio();
+
+  const answer = state.puzzle.answer;
+
+  if (char === '⌫') {
+    if (state.input.length > 0) {
+      state.input.pop();
+      sfxBackspace();
+      updateAnswerBoxes();
+    }
+    return;
+  }
+
+  if (char === '✓') {
+    checkAnswer();
+    return;
+  }
+
+  // Normal character
+  if (state.input.length < answer.length) {
+    state.input.push(char.toUpperCase());
+    sfxKey();
+    updateAnswerBoxes();
+    // Auto-submit when filled
+    if (state.input.length === answer.length) {
+      setTimeout(checkAnswer, 120);
+    }
+  }
+}
+
+function updateAnswerBoxes() {
+  if (!state.puzzle) return;
+  const answer = state.puzzle.answer;
+  for (let i = 0; i < answer.length; i++) {
+    const box = document.getElementById(`abox${i}`);
+    if (!box) continue;
+    if (state.hintRevealed.includes(i)) {
+      box.textContent = answer[i];
+      box.classList.add('revealed');
+    } else if (state.input[i]) {
+      box.textContent = state.input[i];
+      box.classList.remove('revealed');
+    } else {
+      box.textContent = '';
+      box.classList.remove('revealed');
+    }
+    box.classList.remove('shake', 'glow');
+  }
+}
+
+function checkAnswer() {
+  if (!state.puzzle) return;
+  const answer = state.puzzle.answer.toUpperCase();
+
+  // Build submission: merge hint reveals + typed input
+  let submission = '';
+  for (let i = 0; i < answer.length; i++) {
+    if (state.hintRevealed.includes(i)) {
+      submission += answer[i];
+    } else {
+      submission += (state.input[i] || '');
+    }
+  }
+
+  if (submission === answer) {
+    onPuzzleSolved();
+  } else {
+    onWrongAnswer();
+  }
+}
+
+function onPuzzleSolved() {
+  clearInterval(state.hintCountdown);
+  sfxSolve();
+  markSolved(state.puzzle.id);
+  state.solvedAnim = true;
+
+  // Glow all boxes
+  for (let i = 0; i < state.puzzle.answer.length; i++) {
+    const box = document.getElementById(`abox${i}`);
+    if (box) { box.textContent = state.puzzle.answer[i]; box.classList.add('glow'); }
+  }
+
+  // Trigger FX particles
+  if (typeof spawnSolveParticles === 'function') spawnSolveParticles();
+
+  // Update scores
+  const chapter = CHAPTERS[state.chapterIdx];
+  const solvedInChapter = chapter.puzzles.filter(p => isPuzzleSolved(p.id)).length;
+  Scores.set('arbor-enigma', save.solvedIds.length);
+
+  setTimeout(() => {
+    const chapter = CHAPTERS[state.chapterIdx];
+    const allSolved = chapter.puzzles.every(p => isPuzzleSolved(p.id));
+    if (allSolved) {
+      // Unlock next chapter
+      const nextCh = CHAPTERS[state.chapterIdx + 1];
+      if (nextCh) unlockChapter(nextCh.id);
+      sfxChapterComplete();
+      showChapterCompleteOverlay(chapter);
+    } else {
+      showSolvedOverlay();
+    }
+  }, 900);
+}
+
+function onWrongAnswer() {
+  sfxWrong();
+  state.wrongAnim = true;
+  // Shake answer boxes
+  for (let i = 0; i < state.puzzle.answer.length; i++) {
+    const box = document.getElementById(`abox${i}`);
+    if (box) box.classList.add('shake');
+  }
+  clearTimeout(state.wrongTimer);
+  state.wrongTimer = setTimeout(() => {
+    state.wrongAnim = false;
+    // Clear typed but keep hints
+    state.input = [];
+    updateAnswerBoxes();
+  }, 600);
+}
+
+// ── Hint System ────────────────────────────────────────────
+function triggerHint() {
+  if (!state.puzzle) return;
+  const answer = state.puzzle.answer;
+  // Find unrevealed, untyped positions
+  const candidates = [];
+  for (let i = 0; i < answer.length; i++) {
+    if (!state.hintRevealed.includes(i)) candidates.push(i);
+  }
+  if (candidates.length === 0) return;
+  const idx = candidates[Math.floor(Math.random() * candidates.length)];
+  state.hintRevealed.push(idx);
+  // Remove that char from input if typed
+  state.input[idx] = undefined;
+  sfxHint();
+  updateAnswerBoxes();
+  const _hl = document.getElementById('hintLabel');
+  if (_hl) { _hl.textContent = '💡 Hint revealed!'; setTimeout(() => { _hl.textContent = ''; }, 2000); }
+}
+
+// ── Solved / Chapter Complete overlays ────────────────────
+function showSolvedOverlay() {
+  const ov = document.getElementById('solvedOverlay');
+  ov.classList.remove('hidden');
+
+  const chapter = CHAPTERS[state.chapterIdx];
+  const nextPuzzleIdx = state.puzzleIdx + 1;
+  const hasNext = nextPuzzleIdx < chapter.puzzles.length;
+
+  document.getElementById('solvedNextBtn').style.display = hasNext ? '' : 'none';
+  document.getElementById('solvedMenuBtn').style.display = hasNext ? 'none' : '';
+
+  document.getElementById('solvedNextBtn').onclick = () => {
+    ov.classList.add('hidden');
+    loadPuzzle(state.chapterIdx, nextPuzzleIdx);
+  };
+  document.getElementById('solvedMenuBtn').onclick = () => {
+    ov.classList.add('hidden');
+    buildChapterScreen();
+    showScreen('chapterScreen');
+  };
+}
+
+function showChapterCompleteOverlay(chapter) {
+  const ov = document.getElementById('chapterCompleteOverlay');
+  ov.classList.remove('hidden');
+  document.getElementById('ccTitle').textContent = '✦ ' + chapter.title + ' Complete ✦';
+  document.getElementById('ccSub').textContent   = chapter.title + ' — all mysteries solved';
+  document.getElementById('ccIcon').textContent  = chapter.icon;
+
+  const nextChIdx = state.chapterIdx + 1;
+  const hasNextCh = nextChIdx < CHAPTERS.length && save.unlockedChapters.includes(CHAPTERS[nextChIdx].id);
+
+  document.getElementById('ccNextBtn').style.display = hasNextCh ? '' : 'none';
+  document.getElementById('ccMenuBtn').textContent = hasNextCh ? 'Chapter Select' : 'All Done!';
+
+  document.getElementById('ccNextBtn').onclick = () => {
+    ov.classList.add('hidden');
+    loadPuzzle(nextChIdx, 0);
+  };
+  document.getElementById('ccMenuBtn').onclick = () => {
+    ov.classList.add('hidden');
+    buildChapterScreen();
+    showScreen('chapterScreen');
+  };
+}
+
+// ── Chapter Screen Builder ─────────────────────────────────
+function buildChapterScreen() {
+  const grid = document.getElementById('chapterGrid');
+  grid.innerHTML = '';
+  CHAPTERS.forEach((ch, ci) => {
+    const unlocked = save.unlockedChapters.includes(ch.id);
+    const solvedCount = ch.puzzles.filter(p => isPuzzleSolved(p.id)).length;
+    const total = ch.puzzles.length;
+
+    const card = document.createElement('div');
+    card.className = 'chapter-card' + (!unlocked ? ' locked' : '');
+    card.style.setProperty('--ch-color', ch.color);
+
+    card.innerHTML = `
+      <div class="chapter-icon">${unlocked ? ch.icon : '🔒'}</div>
+      <div class="chapter-name">${ch.title}</div>
+      <div class="chapter-progress">${unlocked ? `${solvedCount} / ${total}` : 'Locked'}</div>`;
+
+    if (unlocked && total > 0) {
+      card.addEventListener('click', () => {
+        // Find first unsolved puzzle, or just start from 0
+        let startIdx = ch.puzzles.findIndex(p => !isPuzzleSolved(p.id));
+        if (startIdx < 0) startIdx = 0;
+        loadPuzzle(ci, startIdx);
+      });
+    }
+    grid.appendChild(card);
+  });
+}
+
+// ── Title Screen Population ────────────────────────────────
+function buildTitleScreen() {
+  // Solved count badge
+  const total = CHAPTERS.reduce((sum, ch) => sum + ch.puzzles.length, 0);
+  const solved = save.solvedIds.length;
+  const badge = document.getElementById('titleProgressBadge');
+  if (badge) badge.textContent = total > 0 ? `${solved} / ${total} puzzles solved` : '';
+}
+
+// ── Settings Wiring ────────────────────────────────────────
+function wireSettings() {
+  document.getElementById('settingsBackBtn').addEventListener('click', () => {
+    persistSave();
+    buildChapterScreen();
+    showScreen('chapterScreen');
+  });
+  document.getElementById('resetProgressBtn').addEventListener('click', () => {
+    if (confirm('Reset all progress? This cannot be undone.')) {
+      resetProgress();
+      buildChapterScreen();
+      buildTitleScreen();
+      alert('Progress reset.');
+    }
+  });
+  document.getElementById('chapterBackBtn').addEventListener('click', () => {
+    showScreen('titleScreen');
+  });
+  document.getElementById('titlePlayBtn').addEventListener('click', () => {
+    ensureAudio();
+    if (save.settings.ambient !== false) startAmbient();
+    buildChapterScreen();
+    showScreen('chapterScreen');
+  });
+  document.getElementById('titleChaptersBtn').addEventListener('click', () => {
+    ensureAudio();
+    if (save.settings.ambient !== false) startAmbient();
+    buildChapterScreen();
+    showScreen('chapterScreen');
+  });
+  document.getElementById('titleSettingsBtn').addEventListener('click', () => {
+    showScreen('settingsScreen');
+  });
+  document.getElementById('puzzleBackBtn').addEventListener('click', () => {
+    clearInterval(state.hintCountdown);
+    buildChapterScreen();
+    showScreen('chapterScreen');
+  });
+}
+
+// ── FX Canvas Particle System ──────────────────────────────
+let fxParticles = [];
+
+function spawnSolveParticles() {
+  const cx = fCanvas.width / 2;
+  const cy = fCanvas.height * 0.45;
+  for (let i = 0; i < 40; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.5 + Math.random() * 4;
+    fxParticles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      life: 1, decay: 0.018 + Math.random() * 0.012,
+      r: 3 + Math.random() * 4,
+      color: ['#c9a84c','#7a9e6e','#e8dfc0','#4a8a2e'][Math.floor(Math.random()*4)],
+    });
+  }
+}
+
+function updateFX() {
+  fCtx.clearRect(0, 0, fCanvas.width, fCanvas.height);
+  fxParticles = fxParticles.filter(p => p.life > 0);
+  fxParticles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= p.decay;
+    fCtx.globalAlpha = Math.max(0, p.life);
+    fCtx.fillStyle = p.color;
+    fCtx.beginPath(); fCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2); fCtx.fill();
+  });
+  fCtx.globalAlpha = 1;
+  requestAnimationFrame(updateFX);
+}
+
+// ── engineInit ─────────────────────────────────────────────
+function engineInit() {
+  loadSave();
+  wireSettings();
+  buildTitleScreen();
+  showScreen('titleScreen');
+  updateFX(); // start FX loop
+  // Dispatch to puzzle-type renderers (phase 3+)
+  if (typeof initPuzzleRenderers === 'function') initPuzzleRenderers();
+}
+
+
+/* =============================================================
+   PHASE 3 — ECLIPSE Puzzle Renderer
+   Drag translucent discs over a canvas. Where ≥2 discs overlap
+   a hidden letter fragment is revealed. When all letters are
+   visible the player reads the word and types it.
+   ============================================================= */
+
+// ── Shared puzzle render dispatch ─────────────────────────
+let currentRenderer = null; // { update, onPointer }
+
+function renderPuzzle(puzzle) {
+  // Clear canvas
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  if (currentRenderer && currentRenderer.destroy) currentRenderer.destroy();
+  currentRenderer = null;
+
+  switch (puzzle.type) {
+    case 'ECLIPSE':  currentRenderer = buildEclipseRenderer(puzzle); break;
+    case 'PATHWAY':  currentRenderer = buildPathwayRenderer(puzzle);  break;
+    case 'PIXEL':    currentRenderer = buildPixelRenderer(puzzle);     break;
+    case 'SCATTER':  currentRenderer = buildScatterRenderer(puzzle);   break;
+    case 'CIPHER':   currentRenderer = buildCipherRenderer(puzzle);    break;
+    case 'SEQUENCE': currentRenderer = buildSequenceRenderer(puzzle);  break;
+    default:
+      pCtx.fillStyle = '#e8dfc0'; pCtx.font = '18px Georgia';
+      pCtx.textAlign = 'center'; pCtx.fillText('(puzzle type coming soon)', pCanvas.width/2, pCanvas.height/2);
+  }
+
+  // Update puzzle instruction
+  if (puzzle.instruction) document.getElementById('puzzleInstruction').textContent = puzzle.instruction;
+
+  if (currentRenderer) requestAnimationFrame(puzzleRenderLoop);
+}
+
+let _renderLoopActive = false;
+function puzzleRenderLoop() {
+  if (!currentRenderer) { _renderLoopActive = false; return; }
+  _renderLoopActive = true;
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  if (currentRenderer.update) currentRenderer.update();
+  requestAnimationFrame(puzzleRenderLoop);
+}
+
+// ── Pointer event forwarding ───────────────────────────────
+function getPuzzlePointerPos(e) {
+  const r = pCanvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return { x: src.clientX - r.left, y: src.clientY - r.top };
+}
+pCanvas.addEventListener('pointerdown', e => {
+  if (currentRenderer && currentRenderer.onPointerDown) currentRenderer.onPointerDown(getPuzzlePointerPos(e));
+});
+pCanvas.addEventListener('pointermove', e => {
+  if (currentRenderer && currentRenderer.onPointerMove) currentRenderer.onPointerMove(getPuzzlePointerPos(e));
+});
+pCanvas.addEventListener('pointerup', e => {
+  if (currentRenderer && currentRenderer.onPointerUp) currentRenderer.onPointerUp(getPuzzlePointerPos(e));
+});
+pCanvas.addEventListener('touchstart',  e => { e.preventDefault(); if (currentRenderer && currentRenderer.onPointerDown) currentRenderer.onPointerDown(getPuzzlePointerPos(e)); }, { passive: false });
+pCanvas.addEventListener('touchmove',   e => { e.preventDefault(); if (currentRenderer && currentRenderer.onPointerMove) currentRenderer.onPointerMove(getPuzzlePointerPos(e)); }, { passive: false });
+pCanvas.addEventListener('touchend',    e => { if (currentRenderer && currentRenderer.onPointerUp) currentRenderer.onPointerUp({}); });
+
+// ── ECLIPSE renderer ───────────────────────────────────────
+function buildEclipseRenderer(puzzle) {
+  // puzzle.data = { letters: [{char, x, y}], discs: [{x, y, r, color}] }
+  // Discs can be dragged. Where 2+ discs overlap, letters beneath are revealed.
+  const W = pCanvas.width, H = pCanvas.height;
+  const cx = W / 2, cy = H * 0.48;
+
+  // Build discs from puzzle data or generate defaults
+  const discCount = puzzle.data.discs ? puzzle.data.discs.length : puzzle.answer.length + 1;
+  const discs = puzzle.data.discs
+    ? puzzle.data.discs.map(d => ({ x: cx + d.x * W * 0.35, y: cy + d.y * H * 0.28, r: d.r || 90, color: d.color || '#4a8a2e', dragging: false, ox: 0, oy: 0 }))
+    : Array.from({ length: discCount }, (_, i) => {
+        const angle = (i / discCount) * Math.PI * 2;
+        return {
+          x: cx + Math.cos(angle) * W * 0.22,
+          y: cy + Math.sin(angle) * H * 0.18,
+          r: 85, color: ['#2d5a1b','#1a4a6e','#5c3a1e','#6e1a4a'][i % 4],
+          dragging: false, ox: 0, oy: 0,
+        };
+      });
+
+  // Letter targets — positioned in a region that requires overlap
+  const letters = puzzle.data.letters
+    ? puzzle.data.letters.map(l => ({ char: l.char, x: cx + l.x * W * 0.3, y: cy + l.y * H * 0.22 }))
+    : puzzle.answer.split('').map((c, i) => ({
+        char: c,
+        x: cx + (i - (puzzle.answer.length - 1) / 2) * 48,
+        y: cy,
+      }));
+
+  let dragIdx = -1;
+
+  function isOverlappedAt(lx, ly) {
+    let count = 0;
+    discs.forEach(d => {
+      const dx = lx - d.x, dy = ly - d.y;
+      if (dx * dx + dy * dy <= d.r * d.r) count++;
+    });
+    return count >= 2;
+  }
+
+  function update() {
+    // Dark forest background
+    const bg = pCtx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
+    bg.addColorStop(0, '#1a2e1a'); bg.addColorStop(1, '#0a140a');
+    pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
+
+    // Draw discs (semi-transparent)
+    discs.forEach(d => {
+      pCtx.save();
+      pCtx.globalAlpha = 0.38;
+      pCtx.beginPath(); pCtx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      pCtx.fillStyle = d.color; pCtx.fill();
+      pCtx.globalAlpha = 0.6;
+      pCtx.strokeStyle = 'rgba(201,168,76,0.5)'; pCtx.lineWidth = 1.5; pCtx.stroke();
+      pCtx.restore();
+    });
+
+    // Intersection glow where ≥2 discs overlap (approximate visual)
+    pCtx.save();
+    pCtx.globalCompositeOperation = 'screen';
+    pCtx.globalAlpha = 0.18;
+    for (let i = 0; i < discs.length; i++) {
+      for (let j = i + 1; j < discs.length; j++) {
+        const di = discs[i], dj = discs[j];
+        const mx = (di.x + dj.x) / 2, my = (di.y + dj.y) / 2;
+        const g = pCtx.createRadialGradient(mx, my, 0, mx, my, 60);
+        g.addColorStop(0, '#c9a84c'); g.addColorStop(1, 'transparent');
+        pCtx.fillStyle = g; pCtx.beginPath(); pCtx.arc(mx, my, 60, 0, Math.PI * 2); pCtx.fill();
+      }
+    }
+    pCtx.restore();
+
+    // Draw letters: visible only where overlapped
+    letters.forEach(l => {
+      const visible = isOverlappedAt(l.x, l.y);
+      pCtx.save();
+      if (visible) {
+        pCtx.globalAlpha = 1;
+        pCtx.fillStyle = '#c9a84c';
+        pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 18;
+      } else {
+        pCtx.globalAlpha = 0.08;
+        pCtx.fillStyle = '#e8dfc0';
+      }
+      pCtx.font = 'bold 48px Georgia';
+      pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+      pCtx.fillText(l.char, l.x, l.y);
+      pCtx.restore();
+    });
+
+    // Instruction nudge if all revealed
+    const allRevealed = letters.every(l => isOverlappedAt(l.x, l.y));
+    if (allRevealed) {
+      pCtx.save();
+      pCtx.globalAlpha = 0.7; pCtx.fillStyle = '#c9a84c';
+      pCtx.font = '13px Georgia'; pCtx.textAlign = 'center';
+      pCtx.fillText('Type the revealed word ↓', cx, cy + H * 0.25);
+      pCtx.restore();
+    }
+  }
+
+  function onPointerDown(pos) {
+    // Pick topmost disc under pointer
+    for (let i = discs.length - 1; i >= 0; i--) {
+      const d = discs[i];
+      const dx = pos.x - d.x, dy = pos.y - d.y;
+      if (dx * dx + dy * dy <= d.r * d.r) {
+        dragIdx = i; d.dragging = true;
+        d.ox = pos.x - d.x; d.oy = pos.y - d.y;
+        break;
+      }
+    }
+  }
+  function onPointerMove(pos) {
+    if (dragIdx < 0) return;
+    discs[dragIdx].x = pos.x - discs[dragIdx].ox;
+    discs[dragIdx].y = pos.y - discs[dragIdx].oy;
+  }
+  function onPointerUp() { if (dragIdx >= 0) { discs[dragIdx].dragging = false; dragIdx = -1; } }
+
+  return { update, onPointerDown, onPointerMove, onPointerUp };
+}
+
+
+/* =============================================================
+   PHASE 4 — PATHWAY Puzzle Renderer
+   A tree of branching paths is drawn. The player traces a
+   route from root to leaf. Each edge has a letter fragment.
+   Tracing the correct sequence spells the answer.
+   ============================================================= */
+
+function buildPathwayRenderer(puzzle) {
+  const W = pCanvas.width, H = pCanvas.height;
+  const cx = W / 2;
+
+  // Build tree nodes from puzzle.data.nodes, or auto-generate
+  // nodes: [{ id, x, y, letter, children: [id,...] }]
+  // The correct path spells puzzle.answer
+  const nodes = puzzle.data.nodes || autoGenPathway(puzzle.answer, cx, H);
+
+  // Adjacency map: id -> node
+  const nodeMap = {};
+  nodes.forEach(n => { nodeMap[n.id] = n; });
+
+  // Trace state
+  let traceNodes = [nodes[0].id]; // always start from root
+  let traceComplete = false;
+
+  // Build the correct path (root + answer chars)
+  function getCorrectPath() {
+    // DFS to find path that spells the answer
+    function dfs(nodeId, depth, path) {
+      const node = nodeMap[nodeId];
+      if (!node) return null;
+      if (depth === puzzle.answer.length) return path;
+      const target = puzzle.answer[depth].toUpperCase();
+      for (const childId of (node.children || [])) {
+        const child = nodeMap[childId];
+        if (child && child.letter === target) {
+          const result = dfs(childId, depth + 1, [...path, childId]);
+          if (result) return result;
+        }
+      }
+      return null;
+    }
+    return [nodes[0].id, ...(dfs(nodes[0].id, 0, []) || [])];
+  }
+
+  function isTraced(nid) { return traceNodes.includes(nid); }
+
+  // Visual: last touched node that can be extended
+  let hoverNode = null;
+
+  function update() {
+    // Background
+    const bg = pCtx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0d1f0d'); bg.addColorStop(1, '#1a3010');
+    pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
+
+    // Draw edges
+    nodes.forEach(n => {
+      (n.children || []).forEach(cid => {
+        const child = nodeMap[cid];
+        if (!child) return;
+        const traced = isTraced(n.id) && isTraced(cid);
+        pCtx.save();
+        pCtx.strokeStyle = traced ? '#c9a84c' : 'rgba(122,158,110,0.3)';
+        pCtx.lineWidth = traced ? 3 : 1.5;
+        if (traced) { pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 8; }
+        pCtx.beginPath(); pCtx.moveTo(n.x, n.y); pCtx.lineTo(child.x, child.y);
+        pCtx.stroke(); pCtx.restore();
+
+        // Letter on edge midpoint
+        if (child.letter) {
+          const mx = (n.x + child.x) / 2, my = (n.y + child.y) / 2;
+          pCtx.save();
+          pCtx.fillStyle = traced ? '#c9a84c' : 'rgba(232,223,192,0.4)';
+          pCtx.font = traced ? 'bold 20px Georgia' : '16px Georgia';
+          pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+          if (traced) { pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 10; }
+          pCtx.fillText(child.letter, mx, my - 8);
+          pCtx.restore();
+        }
+      });
+    });
+
+    // Draw nodes
+    nodes.forEach(n => {
+      const traced = isTraced(n.id);
+      const isRoot = n.id === nodes[0].id;
+      const isLeaf = !n.children || n.children.length === 0;
+      pCtx.save();
+      pCtx.beginPath(); pCtx.arc(n.x, n.y, isRoot ? 14 : isLeaf ? 12 : 10, 0, Math.PI * 2);
+      pCtx.fillStyle = traced ? '#c9a84c' : (isLeaf ? '#4a8a2e' : '#2d5a1b');
+      if (traced) { pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 14; }
+      pCtx.fill();
+      pCtx.strokeStyle = 'rgba(201,168,76,0.6)'; pCtx.lineWidth = 1.5; pCtx.stroke();
+      if (isRoot) {
+        pCtx.fillStyle = '#e8dfc0'; pCtx.font = 'bold 11px Georgia';
+        pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+        pCtx.fillText('▶', n.x, n.y);
+      }
+      pCtx.restore();
+    });
+
+    // Instruction
+    if (traceComplete) {
+      pCtx.save(); pCtx.fillStyle = '#c9a84c'; pCtx.globalAlpha = 0.85;
+      pCtx.font = '13px Georgia'; pCtx.textAlign = 'center';
+      pCtx.fillText('Type the path word ↓', cx, H * 0.12);
+      pCtx.restore();
+    }
+  }
+
+  function onPointerDown(pos) { tapNode(pos); }
+  function onPointerMove(pos) { /* tap only */ }
+  function onPointerUp() {}
+
+  function tapNode(pos) {
+    // Find node near tap
+    let closest = null, closestDist = 30;
+    nodes.forEach(n => {
+      const d = Math.hypot(pos.x - n.x, pos.y - n.y);
+      if (d < closestDist) { closestDist = d; closest = n; }
+    });
+    if (!closest) return;
+
+    // Can only tap a child of the current last node
+    const last = traceNodes[traceNodes.length - 1];
+    const lastNode = nodeMap[last];
+
+    if (closest.id === last && traceNodes.length > 1) {
+      // Tap current last = undo
+      traceNodes.pop();
+      state.input.pop();
+      updateAnswerBoxes();
+      traceComplete = false;
+      return;
+    }
+
+    if (lastNode && (lastNode.children || []).includes(closest.id)) {
+      traceNodes.push(closest.id);
+      if (closest.letter) {
+        state.input.push(closest.letter);
+        updateAnswerBoxes();
+        if (state.input.length === puzzle.answer.length) {
+          traceComplete = true;
+          setTimeout(checkAnswer, 200);
+        }
+      }
+    }
+  }
+
+  return { update, onPointerDown, onPointerMove, onPointerUp };
+}
+
+// Auto-generate a pathway tree from an answer string
+function autoGenPathway(answer, cx, H) {
+  // Build a binary tree where one branch per level spells the answer
+  // and decoy branches add incorrect letters
+  const DECOYS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const nodes = [];
+  let idCounter = 0;
+
+  const root = { id: idCounter++, x: cx, y: H * 0.18, letter: null, children: [] };
+  nodes.push(root);
+
+  let parents = [root];
+  for (let depth = 0; depth < answer.length; depth++) {
+    const correctLetter = answer[depth].toUpperCase();
+    const newParents = [];
+    parents.forEach((parent, pi) => {
+      const branchCount = depth < 2 ? 2 : (Math.random() < 0.5 ? 2 : 1);
+      const correctBranchIdx = Math.floor(Math.random() * branchCount);
+      for (let b = 0; b < branchCount; b++) {
+        const letter = b === correctBranchIdx ? correctLetter
+          : DECOYS.replace(correctLetter, '')[Math.floor(Math.random() * 25)];
+        const spread = W * 0.38 / Math.pow(1.7, depth);
+        const xOff = (b - (branchCount - 1) / 2) * spread * (1 / (parents.length || 1));
+        const node = {
+          id: idCounter++,
+          x: Math.max(40, Math.min(pCanvas.width - 40, parent.x + xOff)),
+          y: H * 0.18 + (depth + 1) * H * 0.12,
+          letter,
+          children: [],
+        };
+        nodes.push(node);
+        parent.children.push(node.id);
+        newParents.push(node);
+      }
+    });
+    parents = newParents;
+  }
+  return nodes;
+}
+
+
+/* =============================================================
+   PHASE 5 — PIXEL Puzzle Renderer
+   A grid of cells is shown. Tapping cells toggles them on/off.
+   When the correct cells form a pixel-art letter (or symbol),
+   a glowing outline appears. The answer is the word formed.
+   ============================================================= */
+
+function buildPixelRenderer(puzzle) {
+  const W = pCanvas.width, H = pCanvas.height;
+  const cx = W / 2;
+
+  // puzzle.data.grids: array of { cols, rows, solution:[[0/1]], label }
+  // Each grid corresponds to one letter of the answer.
+  const grids = puzzle.data.grids || autoGenPixelGrids(puzzle.answer);
+
+  // Cell size computed from grid and available space
+  const CELL = Math.min(Math.floor(Math.min(W * 0.7 / (grids[0].cols), H * 0.45 / grids[0].rows)), 32);
+
+  // Current toggle state for each grid
+  const states = grids.map(g => Array.from({ length: g.rows }, () => new Array(g.cols).fill(0)));
+
+  // Per-grid solved state
+  const solved = grids.map(() => false);
+
+  function isSolved(gi) {
+    const g = grids[gi];
+    for (let r = 0; r < g.rows; r++)
+      for (let c = 0; c < g.cols; c++)
+        if (states[gi][r][c] !== g.solution[r][c]) return false;
+    return true;
+  }
+
+  function gridOrigin(gi) {
+    const totalW = grids.length * (grids[gi].cols * CELL + 20) - 20;
+    const startX = cx - totalW / 2;
+    let xOff = 0;
+    for (let i = 0; i < gi; i++) xOff += grids[i].cols * CELL + 20;
+    return { x: startX + xOff, y: H * 0.22 };
+  }
+
+  function update() {
+    // Background
+    pCtx.fillStyle = '#0d1f0d'; pCtx.fillRect(0, 0, W, H);
+
+    grids.forEach((g, gi) => {
+      const { x: ox, y: oy } = gridOrigin(gi);
+      const gSolved = solved[gi];
+
+      for (let r = 0; r < g.rows; r++) {
+        for (let c = 0; c < g.cols; c++) {
+          const on = states[gi][r][c] === 1;
+          const cx2 = ox + c * CELL + CELL / 2;
+          const cy2 = oy + r * CELL + CELL / 2;
+
+          pCtx.save();
+          pCtx.fillStyle = on
+            ? (gSolved ? '#c9a84c' : '#4a8a2e')
+            : 'rgba(232,223,192,0.06)';
+          pCtx.strokeStyle = gSolved ? 'rgba(201,168,76,0.4)' : 'rgba(122,158,110,0.2)';
+          pCtx.lineWidth = 1;
+          if (on && gSolved) { pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 8; }
+          pCtx.fillRect(ox + c * CELL + 1, oy + r * CELL + 1, CELL - 2, CELL - 2);
+          pCtx.strokeRect(ox + c * CELL, oy + r * CELL, CELL, CELL);
+          pCtx.restore();
+        }
+      }
+
+      // Letter label below grid if solved
+      if (gSolved) {
+        pCtx.save();
+        pCtx.fillStyle = '#c9a84c'; pCtx.globalAlpha = 0.9;
+        pCtx.font = 'bold 20px Georgia'; pCtx.textAlign = 'center';
+        pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 10;
+        pCtx.fillText(puzzle.answer[gi], ox + g.cols * CELL / 2, oy + g.rows * CELL + 26);
+        pCtx.restore();
+      }
+    });
+
+    // "Tap cells to form the letter" hint
+    if (solved.every(s => s)) {
+      pCtx.save(); pCtx.fillStyle = '#c9a84c'; pCtx.globalAlpha = 0.8;
+      pCtx.font = '13px Georgia'; pCtx.textAlign = 'center';
+      pCtx.fillText('Type the word ↓', cx, H * 0.12);
+      pCtx.restore();
+    }
+  }
+
+  function onPointerDown(pos) {
+    grids.forEach((g, gi) => {
+      if (solved[gi]) return;
+      const { x: ox, y: oy } = gridOrigin(gi);
+      const c = Math.floor((pos.x - ox) / CELL);
+      const r = Math.floor((pos.y - oy) / CELL);
+      if (c < 0 || c >= g.cols || r < 0 || r >= g.rows) return;
+      states[gi][r][c] ^= 1; // toggle
+      if (isSolved(gi)) {
+        solved[gi] = true;
+        // Feed letter to input
+        state.input[gi] = puzzle.answer[gi];
+        updateAnswerBoxes();
+        // Check all solved
+        if (solved.every(s => s)) setTimeout(checkAnswer, 300);
+      }
+    });
+  }
+  function onPointerMove() {}
+  function onPointerUp() {}
+
+  return { update, onPointerDown, onPointerMove, onPointerUp };
+}
+
+// Auto-generate pixel grids — simple 5×7 bitmaps for each letter
+const PIXEL_FONT = {
+  A:[[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  B:[[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0]],
+  C:[[0,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[0,1,1,1,1]],
+  D:[[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0]],
+  E:[[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+  F:[[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0]],
+  G:[[0,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,0,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  H:[[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  I:[[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[1,1,1,1,1]],
+  J:[[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[0,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  K:[[1,0,0,0,1],[1,0,0,1,0],[1,0,1,0,0],[1,1,0,0,0],[1,0,1,0,0],[1,0,0,1,0],[1,0,0,0,1]],
+  L:[[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+  M:[[1,0,0,0,1],[1,1,0,1,1],[1,0,1,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  N:[[1,0,0,0,1],[1,1,0,0,1],[1,0,1,0,1],[1,0,0,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  O:[[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  P:[[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0]],
+  Q:[[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,1,0,1],[1,0,0,1,0],[0,1,1,0,1]],
+  R:[[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,0],[1,0,1,0,0],[1,0,0,1,0],[1,0,0,0,1]],
+  S:[[0,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[1,1,1,1,0]],
+  T:[[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+  U:[[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+  V:[[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,0,1,0],[0,0,1,0,0]],
+  W:[[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,1,0,1],[1,0,1,0,1],[1,1,0,1,1],[1,0,0,0,1]],
+  X:[[1,0,0,0,1],[0,1,0,1,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,1,0,1,0],[1,0,0,0,1]],
+  Y:[[1,0,0,0,1],[1,0,0,0,1],[0,1,0,1,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+  Z:[[1,1,1,1,1],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+};
+
+function autoGenPixelGrids(answer) {
+  return answer.toUpperCase().split('').map(char => {
+    const bitmap = PIXEL_FONT[char] || PIXEL_FONT['A'];
+    return { cols: 5, rows: 7, solution: bitmap };
+  });
+}
+
+
+/* =============================================================
+   PHASE 6 — SCATTER Puzzle Renderer
+   Letter tiles are scattered across the canvas. Numbered drop
+   zones sit at the bottom. Player drags each tile to its
+   matching numbered slot to spell the answer.
+   ============================================================= */
+
+function buildScatterRenderer(puzzle) {
+  const W = pCanvas.width, H = pCanvas.height;
+  const cx = W / 2;
+  const answer = puzzle.answer.toUpperCase();
+
+  const TILE_R = Math.min(28, W * 0.07);
+  const SLOT_W = Math.min(48, W * 0.11), SLOT_H = 52;
+  const SLOT_Y = H * 0.72;
+  const totalSlotW = answer.length * (SLOT_W + 8) - 8;
+  const slotStartX = cx - totalSlotW / 2;
+
+  // Slots: { idx, x, y, letter: null }
+  const slots = Array.from({ length: answer.length }, (_, i) => ({
+    idx: i,
+    x: slotStartX + i * (SLOT_W + 8) + SLOT_W / 2,
+    y: SLOT_Y + SLOT_H / 2,
+    letter: null,
+    tileId: null,
+  }));
+
+  // Scatter tiles (answer letters + decoys)
+  const decoyLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(c => !answer.includes(c));
+  const extraCount = Math.min(4, answer.length);
+  const allLetters = answer.split('').concat(decoyLetters.slice(0, extraCount));
+  // Shuffle
+  for (let i = allLetters.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allLetters[i], allLetters[j]] = [allLetters[j], allLetters[i]];
+  }
+
+  const tiles = allLetters.map((letter, i) => {
+    const angle = (i / allLetters.length) * Math.PI * 2;
+    const radius = Math.min(W, H) * 0.28;
+    return {
+      id: i, letter,
+      x: cx + Math.cos(angle) * radius * (0.6 + Math.random() * 0.4),
+      y: H * 0.38 + Math.sin(angle) * H * 0.17 * (0.6 + Math.random() * 0.4),
+      startX: 0, startY: 0,
+      dragging: false, slottedIn: null,
+    };
+  });
+  tiles.forEach(t => { t.startX = t.x; t.startY = t.y; });
+
+  let dragTile = null, dragOX = 0, dragOY = 0;
+
+  function allSlotsFilled() { return slots.every(s => s.tileId !== null); }
+
+  function update() {
+    // Background
+    const bg = pCtx.createRadialGradient(cx, H * 0.4, 0, cx, H * 0.4, Math.max(W, H) * 0.65);
+    bg.addColorStop(0, '#1a2e1a'); bg.addColorStop(1, '#0a140a');
+    pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
+
+    // Draw slots
+    slots.forEach((s, i) => {
+      const filled = s.tileId !== null;
+      pCtx.save();
+      pCtx.strokeStyle = filled ? '#c9a84c' : 'rgba(201,168,76,0.4)';
+      pCtx.lineWidth = filled ? 2 : 1;
+      pCtx.fillStyle = filled ? 'rgba(201,168,76,0.12)' : 'rgba(232,223,192,0.05)';
+      if (filled) { pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 10; }
+      pCtx.beginPath();
+      pCtx.roundRect(s.x - SLOT_W / 2, s.y - SLOT_H / 2, SLOT_W, SLOT_H, 6);
+      pCtx.fill(); pCtx.stroke();
+
+      // Number label above slot
+      pCtx.fillStyle = 'rgba(201,168,76,0.5)'; pCtx.font = '10px Georgia';
+      pCtx.textAlign = 'center';
+      pCtx.fillText(i + 1, s.x, s.y - SLOT_H / 2 - 4);
+      pCtx.restore();
+    });
+
+    // Draw tiles (not dragging ones last)
+    const drawOrder = [...tiles].sort((a, b) => (a.dragging ? 1 : 0) - (b.dragging ? 1 : 0));
+    drawOrder.forEach(t => {
+      pCtx.save();
+      pCtx.beginPath(); pCtx.arc(t.x, t.y, TILE_R, 0, Math.PI * 2);
+      pCtx.fillStyle = t.dragging ? '#c9a84c' : (t.slottedIn !== null ? 'rgba(74,138,46,0.6)' : 'rgba(45,90,27,0.8)');
+      if (t.dragging) { pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 18; }
+      pCtx.fill();
+      pCtx.strokeStyle = t.slottedIn !== null ? '#c9a84c' : 'rgba(201,168,76,0.4)';
+      pCtx.lineWidth = 1.5; pCtx.stroke();
+      pCtx.fillStyle = t.dragging ? '#0a140a' : '#e8dfc0';
+      pCtx.font = `bold ${TILE_R}px Georgia`;
+      pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+      pCtx.fillText(t.letter, t.x, t.y);
+      pCtx.restore();
+    });
+
+    if (allSlotsFilled()) {
+      pCtx.save(); pCtx.fillStyle = '#c9a84c'; pCtx.globalAlpha = 0.8;
+      pCtx.font = '13px Georgia'; pCtx.textAlign = 'center';
+      pCtx.fillText('Type the word ↓', cx, H * 0.12);
+      pCtx.restore();
+    }
+  }
+
+  function onPointerDown(pos) {
+    for (let i = tiles.length - 1; i >= 0; i--) {
+      const t = tiles[i];
+      if (Math.hypot(pos.x - t.x, pos.y - t.y) <= TILE_R + 4) {
+        // Remove from slot if slotted
+        if (t.slottedIn !== null) {
+          slots[t.slottedIn].tileId = null; slots[t.slottedIn].letter = null;
+          t.slottedIn = null;
+          state.input[t.slottedIn] = undefined; // will be re-set on drop
+        }
+        dragTile = t; t.dragging = true;
+        dragOX = pos.x - t.x; dragOY = pos.y - t.y;
+        break;
+      }
+    }
+  }
+  function onPointerMove(pos) {
+    if (!dragTile) return;
+    dragTile.x = pos.x - dragOX;
+    dragTile.y = pos.y - dragOY;
+  }
+  function onPointerUp(pos) {
+    if (!dragTile) return;
+    dragTile.dragging = false;
+
+    // Check if dropped in a slot
+    let dropped = false;
+    slots.forEach((s, si) => {
+      if (dropped) return;
+      if (s.tileId !== null) return; // already occupied
+      if (Math.abs(dragTile.x - s.x) < SLOT_W / 2 + 10 && Math.abs(dragTile.y - s.y) < SLOT_H / 2 + 10) {
+        // Snap to slot
+        dragTile.x = s.x; dragTile.y = s.y;
+        dragTile.slottedIn = si;
+        s.tileId = dragTile.id; s.letter = dragTile.letter;
+        state.input[si] = dragTile.letter;
+        updateAnswerBoxes();
+        dropped = true;
+        if (allSlotsFilled()) setTimeout(checkAnswer, 300);
+      }
+    });
+
+    if (!dropped) {
+      // Return to start
+      dragTile.x = dragTile.startX; dragTile.y = dragTile.startY;
+    }
+    dragTile = null;
+  }
+
+  return { update, onPointerDown, onPointerMove, onPointerUp };
+}
+
+
+/* =============================================================
+   PHASE 7A — CIPHER Puzzle Renderer
+   An encoded message is shown with symbols/numbers replacing
+   letters. A partial decode key is given. Player fills in the
+   remaining letters by typing the decoded word.
+   ============================================================= */
+
+function buildCipherRenderer(puzzle) {
+  const W = pCanvas.width, H = pCanvas.height;
+  const cx = W / 2;
+  const answer = puzzle.answer.toUpperCase();
+
+  // puzzle.data.cipherText: string with encoded glyphs
+  // puzzle.data.key: partial decode map { glyph: letter }
+  // puzzle.data.encoded: parallel array to answer, each item is the cipher glyph for that letter
+
+  const encoded = puzzle.data.encoded || answer.split('').map((c, i) => String(i + 1)); // default: 1,2,3...
+  const key = puzzle.data.key || {};  // partial reveals
+
+  // Alphabet of glyphs shown on canvas as the "cipher"
+  const GLYPHS = ['✦','⬟','⊕','❋','⚘','⌬','⏣','⊛','◈','⊞','⊡','◉','⊟','⊕','✧','⬡','⊛','❖','⊠','✦','◌','⬢','⊚','⊙','⊗','◍'];
+
+  function update() {
+    const bg = pCtx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#120d1e'); bg.addColorStop(1, '#0a0a14');
+    pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
+
+    // Title
+    pCtx.save();
+    pCtx.fillStyle = '#c9a84c'; pCtx.font = 'italic 14px Georgia';
+    pCtx.textAlign = 'center';
+    pCtx.fillText('Decipher the ancient code', cx, H * 0.14);
+    pCtx.restore();
+
+    // Draw encoded glyphs
+    const glyphSize = Math.min(44, W * 0.1);
+    const totalW = encoded.length * (glyphSize + 14) - 14;
+    const startX = cx - totalW / 2;
+    const glyphY = H * 0.38;
+
+    encoded.forEach((glyph, i) => {
+      const gx = startX + i * (glyphSize + 14) + glyphSize / 2;
+
+      // Glyph symbol
+      pCtx.save();
+      pCtx.fillStyle = key[glyph] ? 'rgba(201,168,76,0.6)' : '#7a9e6e';
+      pCtx.font = `${glyphSize * 0.7}px sans-serif`;
+      pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+      pCtx.fillText(glyph, gx, glyphY);
+      pCtx.restore();
+
+      // Underline
+      pCtx.save();
+      pCtx.strokeStyle = 'rgba(201,168,76,0.4)'; pCtx.lineWidth = 1;
+      pCtx.beginPath(); pCtx.moveTo(gx - glyphSize / 2 + 2, glyphY + glyphSize * 0.4);
+      pCtx.lineTo(gx + glyphSize / 2 - 2, glyphY + glyphSize * 0.4); pCtx.stroke();
+      pCtx.restore();
+
+      // Known decode hint below
+      if (key[glyph]) {
+        pCtx.save();
+        pCtx.fillStyle = '#c9a84c'; pCtx.font = 'bold 16px Georgia';
+        pCtx.textAlign = 'center'; pCtx.textBaseline = 'top';
+        pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 6;
+        pCtx.fillText(key[glyph], gx, glyphY + glyphSize * 0.5 + 4);
+        pCtx.restore();
+      }
+    });
+
+    // Decode key panel
+    const keyEntries = Object.entries(key);
+    if (keyEntries.length > 0) {
+      pCtx.save();
+      pCtx.fillStyle = 'rgba(201,168,76,0.06)';
+      const kx = cx - 120, ky = H * 0.56, kw = 240, kh = keyEntries.length * 22 + 24;
+      pCtx.beginPath(); pCtx.roundRect(kx, ky, kw, kh, 8); pCtx.fill();
+      pCtx.strokeStyle = 'rgba(201,168,76,0.2)'; pCtx.lineWidth = 1; pCtx.stroke();
+      pCtx.fillStyle = 'rgba(201,168,76,0.5)'; pCtx.font = '10px Georgia';
+      pCtx.textAlign = 'left'; pCtx.fillText('DECODE KEY', kx + 12, ky + 14);
+      keyEntries.forEach(([g, l], idx) => {
+        pCtx.fillStyle = '#e8dfc0'; pCtx.font = '13px Georgia';
+        pCtx.fillText(`${g}  =  ${l}`, kx + 14, ky + 30 + idx * 22);
+      });
+      pCtx.restore();
+    }
+
+    // Prompt
+    pCtx.save(); pCtx.fillStyle = 'rgba(232,223,192,0.35)';
+    pCtx.font = 'italic 12px Georgia'; pCtx.textAlign = 'center';
+    pCtx.fillText('Type the decoded word ↓', cx, H * 0.88);
+    pCtx.restore();
+  }
+
+  function onPointerDown() {}
+  function onPointerMove() {}
+  function onPointerUp() {}
+
+  return { update, onPointerDown, onPointerMove, onPointerUp };
+}
+
+/* =============================================================
+   PHASE 7B — SEQUENCE Puzzle Renderer
+   A series of illustrated items (animals, plants, symbols)
+   appear in a sequence with one missing. The item's name
+   completes the pattern. Player reads the sequence and types.
+   ============================================================= */
+
+function buildSequenceRenderer(puzzle) {
+  const W = pCanvas.width, H = pCanvas.height;
+  const cx = W / 2;
+
+  // puzzle.data.items: [{ emoji, label }] with one entry having label:'?'
+  // puzzle.answer: the missing item's label
+  const items = puzzle.data.items || autoGenSequenceItems(puzzle.answer);
+  const ITEM_SIZE = Math.min(64, W * 0.13);
+  const gap = Math.min(18, W * 0.04);
+  const totalW = items.length * (ITEM_SIZE + gap) - gap;
+  const startX = cx - totalW / 2;
+  const itemY   = H * 0.38;
+
+  // Animate: pulse the '?' slot
+  let tick = 0;
+
+  function update() {
+    tick++;
+    const bg = pCtx.createRadialGradient(cx, H * 0.4, 0, cx, H * 0.4, Math.max(W, H) * 0.6);
+    bg.addColorStop(0, '#1a2e1a'); bg.addColorStop(1, '#0a140a');
+    pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
+
+    // Sequence title / pattern hint
+    if (puzzle.data.patternHint) {
+      pCtx.save(); pCtx.fillStyle = 'rgba(201,168,76,0.5)';
+      pCtx.font = 'italic 12px Georgia'; pCtx.textAlign = 'center';
+      pCtx.fillText(puzzle.data.patternHint, cx, H * 0.2);
+      pCtx.restore();
+    }
+
+    // Draw items
+    items.forEach((item, i) => {
+      const ix = startX + i * (ITEM_SIZE + gap) + ITEM_SIZE / 2;
+      const iy = itemY + ITEM_SIZE / 2;
+      const isMissing = item.label === '?';
+
+      // Card background
+      pCtx.save();
+      if (isMissing) {
+        const pulse = 0.15 + 0.08 * Math.sin(tick * 0.08);
+        pCtx.fillStyle = `rgba(201,168,76,${pulse})`;
+        pCtx.shadowColor = '#c9a84c'; pCtx.shadowBlur = 14 + 4 * Math.sin(tick * 0.08);
+      } else {
+        pCtx.fillStyle = 'rgba(45,90,27,0.5)';
+      }
+      pCtx.strokeStyle = isMissing ? 'rgba(201,168,76,0.8)' : 'rgba(122,158,110,0.3)';
+      pCtx.lineWidth = isMissing ? 2 : 1;
+      pCtx.beginPath(); pCtx.roundRect(ix - ITEM_SIZE / 2, iy - ITEM_SIZE / 2, ITEM_SIZE, ITEM_SIZE, 10);
+      pCtx.fill(); pCtx.stroke();
+      pCtx.restore();
+
+      // Emoji
+      pCtx.save();
+      pCtx.font = `${ITEM_SIZE * 0.55}px sans-serif`;
+      pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+      pCtx.fillText(isMissing ? '?' : item.emoji, ix, iy);
+      pCtx.restore();
+
+      // Label below
+      pCtx.save();
+      pCtx.fillStyle = isMissing ? 'rgba(201,168,76,0.7)' : 'rgba(232,223,192,0.4)';
+      pCtx.font = `${Math.max(9, ITEM_SIZE * 0.18)}px Georgia`;
+      pCtx.textAlign = 'center';
+      pCtx.fillText(isMissing ? '???' : item.label, ix, iy + ITEM_SIZE / 2 + 14);
+      pCtx.restore();
+
+      // Connector arrow between items
+      if (i < items.length - 1) {
+        const ax = ix + ITEM_SIZE / 2 + gap / 2;
+        pCtx.save();
+        pCtx.fillStyle = 'rgba(122,158,110,0.4)';
+        pCtx.font = '14px sans-serif'; pCtx.textAlign = 'center'; pCtx.textBaseline = 'middle';
+        pCtx.fillText('→', ax, iy);
+        pCtx.restore();
+      }
+    });
+
+    // Instruction
+    pCtx.save(); pCtx.fillStyle = 'rgba(232,223,192,0.35)';
+    pCtx.font = 'italic 12px Georgia'; pCtx.textAlign = 'center';
+    pCtx.fillText('What comes next? Type below ↓', cx, H * 0.88);
+    pCtx.restore();
+  }
+
+  function onPointerDown() {}
+  function onPointerMove() {}
+  function onPointerUp() {}
+
+  return { update, onPointerDown, onPointerMove, onPointerUp };
+}
+
+function autoGenSequenceItems(answer) {
+  // Generic: show 3 items + missing one
+  const EMOJIS = ['🌱','🌿','🍀','🌾','🌲','🌳','🌴','🌵','🎋','🍃','🍂','🍁','🌸','🌺','🌻','🌹','🌷','🌼','🪴','🎍'];
+  const items = EMOJIS.slice(0, 3).map((e, i) => ({ emoji: e, label: '????' }));
+  items.push({ emoji: '❓', label: '?' });
+  return items;
+}
+
+
+/* =============================================================
+   PHASE 8 — Level Definitions (24 puzzles across 4 chapters)
+   6 puzzles per chapter, each using a distinct type.
+   ============================================================= */
+
+// ── Chapter 1: The Seedling (introductory) ─────────────────
+CHAPTERS[0].puzzles = [
+  {
+    id: 'ch1_p1', type: 'ECLIPSE', answer: 'ROOT',
+    instruction: 'Drag the circles until letters appear',
+    data: {
+      discs: [
+        { x: -0.55, y: -0.2, r: 95, color: '#2d5a1b' },
+        { x:  0.55, y: -0.2, r: 95, color: '#1a4a6e' },
+        { x:  0,    y:  0.5, r: 90, color: '#5c3a1e' },
+      ],
+      letters: [
+        { char: 'R', x: -0.28, y: 0 },
+        { char: 'O', x: -0.09, y: 0 },
+        { char: 'O', x:  0.09, y: 0 },
+        { char: 'T', x:  0.28, y: 0 },
+      ],
+    },
+  },
+  {
+    id: 'ch1_p2', type: 'SCATTER', answer: 'LEAF',
+    instruction: 'Drag each letter tile to its numbered slot',
+    data: {},
+  },
+  {
+    id: 'ch1_p3', type: 'PIXEL', answer: 'SEED',
+    instruction: 'Tap cells to form each letter',
+    data: {}, // autoGenPixelGrids used
+  },
+  {
+    id: 'ch1_p4', type: 'PATHWAY', answer: 'BARK',
+    instruction: 'Tap along the correct branch path',
+    data: {}, // autoGenPathway used
+  },
+  {
+    id: 'ch1_p5', type: 'CIPHER', answer: 'MOSS',
+    instruction: 'Use the key to decode the symbols',
+    data: {
+      encoded: ['⬟','⊕','✦','✦'],
+      key: { '⬟': 'M', '✦': 'S' },
+    },
+  },
+  {
+    id: 'ch1_p6', type: 'SEQUENCE', answer: 'FERN',
+    instruction: 'What grows next in the sequence?',
+    data: {
+      patternHint: 'Young plants grow in stages…',
+      items: [
+        { emoji: '🌱', label: 'SPROUT' },
+        { emoji: '🌿', label: 'SHOOT' },
+        { emoji: '🍃', label: 'FROND' },
+        { emoji: '❓', label: '?' },
+      ],
+    },
+  },
+];
+
+// ── Chapter 2: The Canopy (intermediate) ───────────────────
+CHAPTERS[1].puzzles = [
+  {
+    id: 'ch2_p1', type: 'ECLIPSE', answer: 'GROVE',
+    instruction: 'Overlap the discs to reveal the forest word',
+    data: {
+      discs: [
+        { x: -0.5, y: -0.3, r: 88, color: '#2e7a8a' },
+        { x:  0.5, y: -0.3, r: 88, color: '#2d5a1b' },
+        { x: -0.2, y:  0.4, r: 85, color: '#8a5c2e' },
+        { x:  0.2, y:  0.4, r: 85, color: '#4a2e8a' },
+      ],
+      letters: [
+        { char: 'G', x: -0.32, y: 0.05 },
+        { char: 'R', x: -0.16, y: 0.05 },
+        { char: 'O', x:  0,    y: 0.05 },
+        { char: 'V', x:  0.16, y: 0.05 },
+        { char: 'E', x:  0.32, y: 0.05 },
+      ],
+    },
+  },
+  {
+    id: 'ch2_p2', type: 'PATHWAY', answer: 'BIRCH',
+    instruction: 'Follow the correct branch to spell the tree',
+    data: {},
+  },
+  {
+    id: 'ch2_p3', type: 'SCATTER', answer: 'ACORN',
+    instruction: 'Arrange the scattered letters',
+    data: {},
+  },
+  {
+    id: 'ch2_p4', type: 'CIPHER', answer: 'CANOPY',
+    instruction: 'Decode the ancient grove script',
+    data: {
+      encoded: ['◈','⌬','❋','⊕','◉','⏣'],
+      key: { '◈': 'C', '⌬': 'A', '◉': 'P' },
+    },
+  },
+  {
+    id: 'ch2_p5', type: 'PIXEL', answer: 'OAK',
+    instruction: 'Light up the pixel letters',
+    data: {},
+  },
+  {
+    id: 'ch2_p6', type: 'SEQUENCE', answer: 'MAPLE',
+    instruction: 'Which tree completes the sequence?',
+    data: {
+      patternHint: 'Trees of the northern forest…',
+      items: [
+        { emoji: '🌲', label: 'PINE' },
+        { emoji: '🌳', label: 'OAK' },
+        { emoji: '🍂', label: 'BIRCH' },
+        { emoji: '❓', label: '?' },
+      ],
+    },
+  },
+];
+
+// ── Chapter 3: The Roots (harder) ──────────────────────────
+CHAPTERS[2].puzzles = [
+  {
+    id: 'ch3_p1', type: 'SCATTER', answer: 'FUNGUS',
+    instruction: 'Rearrange the letters of the earth dweller',
+    data: {},
+  },
+  {
+    id: 'ch3_p2', type: 'CIPHER', answer: 'LICHEN',
+    instruction: 'Ancient runes hide this organism\'s name',
+    data: {
+      encoded: ['⬡','⊛','◈','⊞','⊡','❋'],
+      key: { '⬡': 'L', '◈': 'C', '⊞': 'H' },
+    },
+  },
+  {
+    id: 'ch3_p3', type: 'ECLIPSE', answer: 'MYCEL',
+    instruction: 'Reveal the hidden network',
+    data: {
+      discs: [
+        { x: -0.6, y: 0, r: 100, color: '#8a5c2e' },
+        { x:  0.6, y: 0, r: 100, color: '#2d5a1b' },
+        { x:  0,   y: 0.5, r: 92, color: '#5c2e8a' },
+      ],
+      letters: [
+        { char: 'M', x: -0.28, y: 0.06 },
+        { char: 'Y', x: -0.14, y: 0.06 },
+        { char: 'C', x:  0,    y: 0.06 },
+        { char: 'E', x:  0.14, y: 0.06 },
+        { char: 'L', x:  0.28, y: 0.06 },
+      ],
+    },
+  },
+  {
+    id: 'ch3_p4', type: 'PATHWAY', answer: 'TUBER',
+    instruction: 'Trace the underground path',
+    data: {},
+  },
+  {
+    id: 'ch3_p5', type: 'PIXEL', answer: 'SPORE',
+    instruction: 'Reconstruct the microscopic letters',
+    data: {},
+  },
+  {
+    id: 'ch3_p6', type: 'SEQUENCE', answer: 'MOLD',
+    instruction: 'What comes at the end of this decay chain?',
+    data: {
+      patternHint: 'The forest floor breaks down…',
+      items: [
+        { emoji: '🍂', label: 'LEAF' },
+        { emoji: '🪵', label: 'LOG' },
+        { emoji: '🍄', label: 'FUNGI' },
+        { emoji: '❓', label: '?' },
+      ],
+    },
+  },
+];
+
+// ── Chapter 4: The Bloom (challenging) ─────────────────────
+CHAPTERS[3].puzzles = [
+  {
+    id: 'ch4_p1', type: 'CIPHER', answer: 'POLLEN',
+    instruction: 'Decode the language of flowers',
+    data: {
+      encoded: ['✧','⊕','⬢','⊛','⊡','❋'],
+      key: { '✧': 'P', '⬢': 'L' },
+    },
+  },
+  {
+    id: 'ch4_p2', type: 'ECLIPSE', answer: 'NECTAR',
+    instruction: 'Six petals hide the sweet word',
+    data: {
+      discs: [
+        { x: -0.5, y: -0.4, r: 90, color: '#8a2e6e' },
+        { x:  0.5, y: -0.4, r: 90, color: '#8a6e2e' },
+        { x: -0.6, y:  0.3, r: 88, color: '#2e6e8a' },
+        { x:  0.6, y:  0.3, r: 88, color: '#2e8a4e' },
+        { x:  0,   y:  0.6, r: 85, color: '#6e2e8a' },
+      ],
+      letters: [
+        { char: 'N', x: -0.33, y: 0.04 },
+        { char: 'E', x: -0.2,  y: 0.04 },
+        { char: 'C', x: -0.07, y: 0.04 },
+        { char: 'T', x:  0.07, y: 0.04 },
+        { char: 'A', x:  0.2,  y: 0.04 },
+        { char: 'R', x:  0.33, y: 0.04 },
+      ],
+    },
+  },
+  {
+    id: 'ch4_p3', type: 'SCATTER', answer: 'PISTIL',
+    instruction: 'Arrange the anatomy of the flower',
+    data: {},
+  },
+  {
+    id: 'ch4_p4', type: 'SEQUENCE', answer: 'BLOOM',
+    instruction: 'Complete the lifecycle of the flower',
+    data: {
+      patternHint: 'A flower\'s journey from seed to…',
+      items: [
+        { emoji: '🌱', label: 'SEED' },
+        { emoji: '🌿', label: 'BUD' },
+        { emoji: '🌸', label: 'PETAL' },
+        { emoji: '❓', label: '?' },
+      ],
+    },
+  },
+  {
+    id: 'ch4_p5', type: 'PATHWAY', answer: 'STAMEN',
+    instruction: 'Chart the flower\'s inner path',
+    data: {},
+  },
+  {
+    id: 'ch4_p6', type: 'PIXEL', answer: 'FLORA',
+    instruction: 'Illuminate the final word of the grove',
+    data: {},
+  },
+];
+
+// ── Wire up chapter progress display on title ──────────────
+function initPuzzleRenderers() {
+  buildTitleScreen();
+}
+
+// ── Puzzle screen background canvas draw (idle state) ──────
+(function drawIdleCanvas() {
+  // Draw a simple forest silhouette on puzzleCanvas when not in puzzle
+  const W = pCanvas.width, H = pCanvas.height;
+  pCtx.clearRect(0, 0, W, H);
+  const bg = pCtx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0a140a'); bg.addColorStop(1, '#1a2e1a');
+  pCtx.fillStyle = bg; pCtx.fillRect(0, 0, W, H);
+
+  // Simple tree silhouettes
+  [[0.15,0.7,18,90],[0.35,0.75,14,70],[0.65,0.72,16,80],[0.85,0.68,20,100],[0.5,0.65,12,55]].forEach(([rx,ry,rw,rh]) => {
+    const x = W * rx, y = H * ry;
+    pCtx.save();
+    pCtx.fillStyle = 'rgba(30,60,20,0.5)';
+    pCtx.beginPath(); pCtx.ellipse(x, y, W * rw / 100, H * rh / 600, 0, 0, Math.PI * 2);
+    pCtx.fill(); pCtx.restore();
+  });
+})();
+
+// End of Arbor Enigma script
+</script>
+</body>
+</html>

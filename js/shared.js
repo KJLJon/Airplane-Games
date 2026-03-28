@@ -42,7 +42,7 @@ const Scores = {
     return false;
   },
   getAll() {
-    const games = ['tetris','sudoku','runner','chess-puzzles','sliding-puzzle','snake','traffic','minesweeper','wordle','2048','dogfight','maze','stratego','nonogram','flapper','simon','multiplier-runner','lane-shooter'];
+    const games = ['tetris','sudoku','runner','chess-puzzles','sliding-puzzle','snake','traffic','minesweeper','wordle','2048','dogfight','maze','stratego','nonogram','flapper','simon','multiplier-runner','lane-shooter','slide-dash','orb-merge','sky-slope','turbo-tunnels','arbor-enigma'];
     const result = {};
     games.forEach(id => { result[id] = this.get(id); });
     return result;
