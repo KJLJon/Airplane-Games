@@ -308,13 +308,17 @@ let isMuted = false, musicVol = 0.35, sfxVol = 0.7;
 
 function initAudio() {
   if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  musicGain = audioCtx.createGain(); musicGain.gain.value = musicVol; musicGain.connect(audioCtx.destination);
-  sfxGain   = audioCtx.createGain(); sfxGain.gain.value   = sfxVol;   sfxGain.connect(audioCtx.destination);
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  try {
+    audioCtx = new Ctx();
+    musicGain = audioCtx.createGain(); musicGain.gain.value = musicVol; musicGain.connect(audioCtx.destination);
+    sfxGain   = audioCtx.createGain(); sfxGain.gain.value   = sfxVol;   sfxGain.connect(audioCtx.destination);
+  } catch(_) { audioCtx = null; }
 }
 function ensureAudio() {
   initAudio();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 }
 function toggleMute() {
   isMuted = !isMuted;
