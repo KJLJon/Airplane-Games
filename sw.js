@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'airplane-games-v3';
+const CACHE_VERSION = 'airplane-games-v4';
 
 const PRECACHE_URLS = [
   '/Airplane-Games/',
@@ -31,6 +31,11 @@ const PRECACHE_URLS = [
   '/Airplane-Games/games/simon/index.html',
   '/Airplane-Games/games/multiplier-runner/index.html',
   '/Airplane-Games/games/lane-shooter/index.html',
+  '/Airplane-Games/games/slide-dash/index.html',
+  '/Airplane-Games/games/orb-merge/index.html',
+  '/Airplane-Games/games/sky-slope/index.html',
+  '/Airplane-Games/games/turbo-tunnels/index.html',
+  '/Airplane-Games/games/arbor-enigma/index.html',
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html>
