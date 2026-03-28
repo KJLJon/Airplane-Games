@@ -839,7 +839,7 @@ function gameLoop() {
   if (chainTimer > 0) { chainTimer--; if (chainTimer === 0) { chainCount = 0; dropping = false; } }
 
   // Drop cooldown
-  if (dropCooldown > 0) dropCooldown--;
+  if (dropCooldown > 0) { dropCooldown--; if (dropCooldown === 0) dropping = false; }
 
   // Physics
   physicsStep();
