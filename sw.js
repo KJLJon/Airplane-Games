@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'airplane-games-v2';
+const CACHE_VERSION = 'airplane-games-v3';
 
 const PRECACHE_URLS = [
   '/Airplane-Games/',
