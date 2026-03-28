@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Orb Merge Frenzy – Airplane Games</title>
+  <base href="/Airplane-Games/">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="js/shared.js" defer></script>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0015; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #fff; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+    /* ── Canvas ───────────────────────────────────────────── */
+    #gameCanvas { display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100dvh; }
+
+    /* ── Screens ──────────────────────────────────────────── */
+    .screen {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 28px 24px;
+      background: rgba(13, 0, 21, 0.93);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .screen.hidden { display: none; }
+
+    /* ── Typography ───────────────────────────────────────── */
+    .game-title {
+      font-size: clamp(2rem, 8vw, 3rem);
+      font-weight: 900; letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #ff4fc8 0%, #e91e8c 50%, #9c27b0 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px; text-align: center;
+    }
+    .game-subtitle { color: #ce93d8; font-size: 0.9rem; margin-bottom: 24px; text-align: center; }
+    .section-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 20px; text-align: center; }
+
+    /* ── Mode selector ────────────────────────────────────── */
+    .mode-row { display: flex; gap: 12px; margin-bottom: 20px; }
+    .mode-btn {
+      flex: 1; max-width: 140px; padding: 14px 10px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-radius: 16px; background: rgba(255,255,255,0.07);
+      color: #fff; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mode-btn:active { transform: scale(0.96); }
+    .mode-btn.selected { border-color: #e91e8c; background: rgba(233,30,140,0.18); }
+    .mode-icon { font-size: 1.5rem; margin-bottom: 4px; }
+    .mode-label { font-size: 0.8rem; color: #ce93d8; margin-top: 2px; }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .btn {
+      display: block; width: 100%; max-width: 300px;
+      padding: 15px 24px; margin: 7px 0;
+      border: none; border-radius: 16px;
+      font-size: 1.05rem; font-weight: 700;
+      cursor: pointer; text-align: center; text-decoration: none;
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: linear-gradient(135deg, #e91e8c, #9c27b0); color: #fff; box-shadow: 0 4px 20px rgba(233,30,140,0.35); }
+    .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.18); }
+
+    /* ── HUD ──────────────────────────────────────────────── */
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 12px 16px; pointer-events: none;
+    }
+    #hud.hidden { display: none; }
+    .hud-score { font-size: 1.5rem; font-weight: 900; text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+    .hud-info  { font-size: 0.78rem; color: #ce93d8; margin-top: 2px; }
+    .hud-timer { font-size: 1.5rem; font-weight: 900; color: #ff4fc8; text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+    .hud-timer.urgent { color: #ff1744; animation: pulse 0.5s infinite alternate; }
+    @keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
+    .hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    #muteBtn {
+      pointer-events: auto;
+      background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; border-radius: 50%; width: 40px; height: 40px;
+      font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #pauseBtn {
+      pointer-events: auto;
+      background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; border-radius: 50%; width: 40px; height: 40px;
+      font-size: 0.9rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Next orb preview ─────────────────────────────────── */
+    #nextOrbWrap {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 10; text-align: center; pointer-events: none;
+    }
+    #nextOrbWrap.hidden { display: none; }
+    #nextOrbLabel { font-size: 0.7rem; color: #ce93d8; margin-bottom: 2px; }
+    #nextOrbCanvas { display: block; margin: 0 auto; }
+
+    /* ── Multiplier flash ─────────────────────────────────── */
+    .multi-pop {
+      position: fixed; top: 40%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2rem; font-weight: 900;
+      color: #ffd700; text-shadow: 0 0 24px #ff9800;
+      pointer-events: none;
+      animation: multiPop 0.7s ease-out forwards;
+      z-index: 35; white-space: nowrap;
+    }
+    @keyframes multiPop {
+      0%   { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+      100% { opacity: 0; transform: translate(-50%, -120%) scale(0.8); }
+    }
+
+    /* ── Game Over ────────────────────────────────────────── */
+    .final-score { font-size: 2.8rem; font-weight: 900; color: #ff4fc8; margin: 10px 0; }
+    .new-record {
+      background: linear-gradient(135deg, #ffd700, #ff9800);
+      color: #000; padding: 5px 16px; border-radius: 20px;
+      font-weight: 900; font-size: 0.85rem; margin-bottom: 8px; display: inline-block;
+    }
+    .breakdown {
+      background: rgba(255,255,255,0.05); border-radius: 14px;
+      padding: 14px 18px; width: 100%; max-width: 300px; margin: 10px 0;
+    }
+    .bd-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 0.87rem; color: #ce93d8; }
+    .bd-row strong { color: #fff; }
+    .bd-total { border-top: 1px solid rgba(255,255,255,0.15); margin-top: 8px; padding-top: 8px; font-weight: 700; font-size: 1rem; color: #fff; }
+
+    /* ── Pause overlay ────────────────────────────────────── */
+    #pauseScreen .section-title { margin-bottom: 30px; }
+
+    /* ── Settings ─────────────────────────────────────────── */
+    .settings-group { width: 100%; max-width: 320px; margin-bottom: 18px; }
+    .settings-label { color: #ce93d8; font-size: 0.82rem; margin-bottom: 8px; display: block; }
+    .slider { width: 100%; height: 6px; accent-color: #e91e8c; cursor: pointer; }
+
+    /* ── Skin grid ────────────────────────────────────────── */
+    .skin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 320px; }
+    .skin-card {
+      padding: 12px 10px; border-radius: 14px;
+      background: rgba(255,255,255,0.07); border: 2px solid transparent;
+      cursor: pointer; text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .skin-card.selected { border-color: #e91e8c; background: rgba(233,30,140,0.12); }
+    .skin-card.locked   { opacity: 0.4; cursor: default; }
+    .skin-name  { font-weight: 700; font-size: 0.88rem; margin-bottom: 3px; }
+    .skin-req   { font-size: 0.72rem; color: #ce93d8; }
+
+    /* ── Score card ───────────────────────────────────────── */
+    .score-card { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 22px; width: 100%; max-width: 300px; text-align: center; margin-bottom: 12px; }
+    .score-card-val   { font-size: 2.6rem; font-weight: 900; color: #ff4fc8; }
+    .score-card-label { color: #ce93d8; font-size: 0.82rem; margin-top: 6px; }
+
+    /* ── Scroll wrap ──────────────────────────────────────── */
+    .scroll-wrap { overflow-y: auto; max-height: 62vh; width: 100%; display: flex; flex-direction: column; align-items: center; -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body>
+
+<!-- Canvas -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div>
+    <div class="hud-score" id="hudScore">0</div>
+    <div class="hud-info"  id="hudInfo">Zen Mode</div>
+  </div>
+  <div class="hud-right">
+    <div class="hud-timer hidden" id="hudTimer">60</div>
+    <button id="muteBtn"  aria-label="Toggle mute">🔊</button>
+    <button id="pauseBtn" aria-label="Pause">⏸</button>
+  </div>
+</div>
+
+<!-- Next orb preview -->
+<div id="nextOrbWrap" class="hidden">
+  <div id="nextOrbLabel">NEXT</div>
+  <canvas id="nextOrbCanvas" width="60" height="60"></canvas>
+</div>
+
+<!-- Start screen -->
+<div id="startScreen" class="screen">
+  <div class="game-title">Orb Merge<br>Frenzy</div>
+  <div class="game-subtitle">Drop · Merge · Chain!</div>
+  <div class="mode-row">
+    <div class="mode-btn selected" id="modeZen" data-mode="zen">
+      <div class="mode-icon">🧘</div>
+      Zen
+      <div class="mode-label">No timer</div>
+    </div>
+    <div class="mode-btn" id="modeTimed" data-mode="timed">
+      <div class="mode-icon">⏱</div>
+      Timed
+      <div class="mode-label">60 seconds</div>
+    </div>
+  </div>
+  <button class="btn btn-primary" id="playBtn">▶&nbsp; Play</button>
+  <button class="btn btn-secondary" id="scoresBtn">🏆&nbsp; High Scores</button>
+  <button class="btn btn-secondary" id="settingsBtn">⚙&nbsp; Settings</button>
+  <a href="../../" class="btn btn-secondary">🏠&nbsp; Back to Hub</a>
+</div>
+
+<!-- Pause screen -->
+<div id="pauseScreen" class="screen hidden">
+  <div class="section-title">⏸ Paused</div>
+  <button class="btn btn-primary"   id="resumeBtn">▶ Resume</button>
+  <button class="btn btn-secondary" id="restartBtn">↺ Restart</button>
+  <button class="btn btn-secondary" id="pauseSettingsBtn">⚙ Settings</button>
+</div>
+
+<!-- Game Over screen -->
+<div id="gameoverScreen" class="screen hidden">
+  <div class="section-title">Game Over</div>
+  <div id="newRecordBadge" class="new-record hidden">🏆 NEW RECORD!</div>
+  <div class="final-score" id="finalScore">0</div>
+  <div class="breakdown" id="scoreBreakdown"></div>
+  <button class="btn btn-primary"   id="playAgainBtn">▶ Play Again</button>
+  <button class="btn btn-secondary" id="menuBtn">🏠 Menu</button>
+</div>
+
+<!-- Settings screen -->
+<div id="settingsScreen" class="screen hidden">
+  <div class="section-title">⚙ Settings</div>
+  <div class="scroll-wrap">
+    <div class="settings-group">
+      <label class="settings-label">🎵 Music Volume</label>
+      <input type="range" class="slider" id="musicVol" min="0" max="100" value="35">
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">🔔 SFX Volume</label>
+      <input type="range" class="slider" id="sfxVol"   min="0" max="100" value="70">
+    </div>
+    <div class="settings-group">
+      <label class="settings-label">✨ Orb Skin</label>
+      <div class="skin-grid" id="skinGrid"></div>
+    </div>
+  </div>
+  <button class="btn btn-secondary" id="settingsBackBtn" style="margin-top:16px">← Back</button>
+</div>
+
+<!-- Scores screen -->
+<div id="scoresScreen" class="screen hidden">
+  <div class="section-title">🏆 High Scores</div>
+  <div id="scoresList" style="width:100%;max-width:320px"></div>
+  <button class="btn btn-secondary" id="scoresBackBtn" style="margin-top:20px">← Back</button>
+</div>
+
+<script>
+/* =============================================================
+   ORB MERGE FRENZY
+   Sections: Canvas → Constants → Audio → Skins →
+             Physics → Merge → Particles → Render →
+             GameLoop → Screens → Init
+   ============================================================= */
+
+// ── Canvas ────────────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  if (typeof layoutContainer === 'function') layoutContainer();
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ── Constants ─────────────────────────────────────────────
+const C = {
+  // Orb tiers: [radius, hue-label] — colours defined per skin
+  TIERS: [
+    { r: 15, label: 'T1' },
+    { r: 22, label: 'T2' },
+    { r: 30, label: 'T3' },
+    { r: 38, label: 'T4' },
+    { r: 46, label: 'T5' },
+    { r: 54, label: 'T6' },
+    { r: 62, label: 'T7' },
+    { r: 72, label: 'MAX' },
+  ],
+  MAX_TIER : 7,   // 0-indexed
+  GRAVITY  : 0.55,
+  DAMPING  : 0.62,// velocity damping on bounce
+  FRICTION : 0.97,// horizontal friction on floor
+  MERGE_GAP: 2,   // extra px tolerance for merge detection
+  TIMED_SEC: 60,
+  DANGER_H : 0.18,// danger line = top 18% of container
+};
+
+// ── Audio ─────────────────────────────────────────────────
+let audioCtx = null, musicGain = null, sfxGain = null;
+let musicTimers = [];
+let isMuted = false, musicVol = 0.35, sfxVol = 0.7;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  musicGain = audioCtx.createGain(); musicGain.gain.value = musicVol; musicGain.connect(audioCtx.destination);
+  sfxGain   = audioCtx.createGain(); sfxGain.gain.value   = sfxVol;   sfxGain.connect(audioCtx.destination);
+}
+function ensureAudio() {
+  initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function toggleMute() {
+  isMuted = !isMuted;
+  if (audioCtx) { musicGain.gain.value = isMuted ? 0 : musicVol; sfxGain.gain.value = isMuted ? 0 : sfxVol; }
+  document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
+}
+function setMusicVol(v) { musicVol = v/100; if (audioCtx && !isMuted) musicGain.gain.value = musicVol; }
+function setSfxVol(v)   { sfxVol   = v/100; if (audioCtx && !isMuted) sfxGain.gain.value   = sfxVol;   }
+
+// Ambient music: soft droning pad + slow arpeggio
+function startMusic() {
+  if (!audioCtx) return;
+  stopMusic();
+  // Drone pad (low held chord)
+  const droneFreqs = [65.4, 98.0, 130.8]; // C2 G2 C3
+  droneFreqs.forEach(f => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.value = 0.06;
+    o.connect(g); g.connect(musicGain); o.start();
+    musicTimers.push(() => { try { o.stop(); } catch(_) {} });
+  });
+  // Gentle arpeggio
+  const arp = [261.6, 329.6, 392.0, 523.2, 392.0, 329.6];
+  let ai = 0;
+  function scheduleArp() {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'triangle'; o.frequency.value = arp[ai++ % arp.length];
+    const t = audioCtx.currentTime;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.09, t+0.06);
+    g.gain.exponentialRampToValueAtTime(0.001, t+0.55);
+    o.connect(g); g.connect(musicGain); o.start(t); o.stop(t+0.6);
+    const tid = setTimeout(scheduleArp, 420);
+    musicTimers.push(tid);
+  }
+  scheduleArp();
+}
+function stopMusic() {
+  musicTimers.forEach(x => { if (typeof x === 'function') x(); else clearTimeout(x); });
+  musicTimers = [];
+}
+
+// SFX — all Web Audio
+function sfxDrop(tier) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  const freq = 400 - tier * 30;
+  o.type = 'sine'; const t = audioCtx.currentTime;
+  o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq*0.7, t+0.08);
+  g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.1);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.1);
+}
+function sfxMerge(tier) {
+  if (!audioCtx) return;
+  // Pitch rises with tier — higher tier = bigger merge = more satisfying pop
+  const baseFreq = 300 + tier * 80;
+  [1, 1.26, 1.5].forEach((mult, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.04;
+    o.type = 'sine'; o.frequency.value = baseFreq * mult;
+    g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.18);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.2);
+  });
+}
+function sfxChain(chainLen) {
+  if (!audioCtx) return;
+  const notes = [523.2, 659.3, 783.9, 1046.5, 1318.5];
+  notes.slice(0, Math.min(chainLen, 5)).forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.09;
+    o.type = 'triangle'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.15);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.16);
+  });
+}
+function sfxGameOver() {
+  if (!audioCtx) return;
+  [400, 300, 220, 150].forEach((f, i) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    const t = audioCtx.currentTime + i * 0.18;
+    o.type = 'sawtooth'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.2);
+    o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.22);
+  });
+}
+function sfxBounce() {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  const t = audioCtx.currentTime;
+  o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(60, t+0.06);
+  g.gain.setValueAtTime(0.15, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.07);
+  o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t+0.08);
+}
+
+// ── Orb Skins ─────────────────────────────────────────────
+// Each skin defines how an orb is drawn given (ctx, x, y, radius, tier)
+const SKINS = [
+  {
+    id: 'classic', name: 'Classic', unlockAt: 0,
+    colors: ['#ef5350','#ff7043','#ffa726','#66bb6a','#26c6da','#42a5f5','#ab47bc','#ffd700'],
+    draw(c, x, y, r, tier) {
+      const col = this.colors[tier];
+      const g = c.createRadialGradient(x-r*0.35, y-r*0.35, r*0.1, x, y, r);
+      g.addColorStop(0, '#fff'); g.addColorStop(0.3, col); g.addColorStop(1, col+'99');
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill();
+    }
+  },
+  {
+    id: 'neon', name: '⚡ Neon', unlockAt: 500,
+    colors: ['#ff1744','#ff6d00','#ffd600','#00e676','#00e5ff','#2979ff','#d500f9','#fff176'],
+    draw(c, x, y, r, tier) {
+      const col = this.colors[tier];
+      c.shadowColor = col; c.shadowBlur = 18;
+      c.fillStyle = col + 'cc';
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill();
+      c.fillStyle = '#fff'; c.globalAlpha = 0.6;
+      c.beginPath(); c.arc(x - r*0.3, y - r*0.3, r*0.28, 0, Math.PI*2); c.fill();
+      c.globalAlpha = 1; c.shadowBlur = 0;
+    }
+  },
+  {
+    id: 'marble', name: '🔮 Marble', unlockAt: 1500,
+    colors: ['#e57373','#ff8a65','#ffb74d','#81c784','#4dd0e1','#64b5f6','#ba68c8','#fff9c4'],
+    draw(c, x, y, r, tier) {
+      const col = this.colors[tier];
+      const g = c.createRadialGradient(x+r*0.2, y-r*0.4, r*0.05, x, y, r*1.1);
+      g.addColorStop(0, '#fff'); g.addColorStop(0.25, col); g.addColorStop(0.6, col+'bb'); g.addColorStop(1, '#333');
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill();
+      // Vein streak
+      c.save(); c.clip(); c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = r*0.12;
+      c.beginPath(); c.moveTo(x-r*0.5, y-r*0.1); c.bezierCurveTo(x, y-r*0.5, x+r*0.3, y+r*0.2, x+r*0.6, y+r*0.4); c.stroke();
+      c.restore();
+    }
+  },
+  {
+    id: 'crystal', name: '💎 Crystal', unlockAt: 3000,
+    colors: ['#ff8a9a','#ffab7a','#ffe57c','#a5d6a7','#80deea','#90caf9','#ce93d8','#fffde7'],
+    draw(c, x, y, r, tier) {
+      const col = this.colors[tier];
+      c.globalAlpha = 0.7;
+      const g = c.createRadialGradient(x-r*0.3, y-r*0.3, r*0.05, x, y, r);
+      g.addColorStop(0, '#fff'); g.addColorStop(0.4, col+'cc'); g.addColorStop(1, col+'44');
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill();
+      // Facet lines
+      c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1.2; c.globalAlpha = 0.5;
+      [-0.4, 0.2, 0.8].forEach(angle => {
+        c.beginPath();
+        c.moveTo(x, y);
+        c.lineTo(x + Math.cos(angle)*r, y + Math.sin(angle)*r);
+        c.stroke();
+      });
+      c.globalAlpha = 1;
+    }
+  },
+];
+
+let unlockedSkins = ['classic'];
+let selectedSkin  = 'classic';
+
+function loadSkins() {
+  try {
+    const d = JSON.parse(localStorage.getItem('ag_orb_merge_skins') || '{}');
+    unlockedSkins = d.unlocked || ['classic'];
+    selectedSkin  = d.selected || 'classic';
+  } catch(_) {}
+}
+function saveSkins() {
+  try { localStorage.setItem('ag_orb_merge_skins', JSON.stringify({ unlocked: unlockedSkins, selected: selectedSkin })); } catch(_) {}
+}
+function checkSkinUnlocks(sc) {
+  SKINS.forEach(s => {
+    if (sc >= s.unlockAt && !unlockedSkins.includes(s.id)) {
+      unlockedSkins.push(s.id);
+      saveSkins();
+      showMultiPop(`🎉 Skin Unlocked: ${s.name}!`);
+    }
+  });
+}
+function getSkin() { return SKINS.find(s => s.id === selectedSkin) || SKINS[0]; }
+
+// ── Container layout ──────────────────────────────────────
+// The container is a rectangular play area centred on screen.
+let container = { x: 0, y: 0, w: 0, h: 0 };
+
+function layoutContainer() {
+  const W = canvas.width, H = canvas.height;
+  const maxW = Math.min(360, W - 16);
+  const maxH = H - 140;  // room for HUD top and next-orb bottom
+  container.w = maxW;
+  container.h = maxH;
+  container.x = (W - maxW) / 2;
+  container.y = H - maxH - 20;
+}
+layoutContainer();
+
+// ── Orb / physics objects ──────────────────────────────────
+// orb: { x, y, vx, vy, r, tier, merging, id }
+let orbs  = [];
+let orbId = 0;
+function makeOrb(x, y, tier) {
+  return { x, y, vx: 0, vy: 0, r: C.TIERS[tier].r, tier, merging: false, id: orbId++ };
+}
+
+// ── Drop cursor ────────────────────────────────────────────
+let dropX      = 0;      // horizontal drop position (initialised in startGame)
+let nextTier   = 0;      // tier of the orb currently queued
+let dropping   = false;  // true while an orb is falling and not yet settled
+
+// ── Physics step ───────────────────────────────────────────
+function physicsStep() {
+  const { x: cx, y: cy, w: cw, h: ch } = container;
+  const floor  = cy + ch;
+  const wallL  = cx;
+  const wallR  = cx + cw;
+
+  orbs.forEach(o => {
+    if (o.merging) return;
+    // Gravity
+    o.vy += C.GRAVITY;
+    o.x  += o.vx;
+    o.y  += o.vy;
+
+    // Floor
+    if (o.y + o.r >= floor) {
+      o.y  = floor - o.r;
+      o.vy = -Math.abs(o.vy) * C.DAMPING;
+      o.vx *= C.FRICTION;
+      if (Math.abs(o.vy) < 0.6) o.vy = 0;
+      if (Math.abs(o.vx) < 0.2) o.vx = 0;
+      if (Math.abs(o.vy) > 0.8) sfxBounce();
+    }
+    // Walls
+    if (o.x - o.r <= wallL) {
+      o.x  = wallL + o.r;
+      o.vx = Math.abs(o.vx) * C.DAMPING;
+    }
+    if (o.x + o.r >= wallR) {
+      o.x  = wallR - o.r;
+      o.vx = -Math.abs(o.vx) * C.DAMPING;
+    }
+    // Ceiling clamp (don't escape top)
+    if (o.y - o.r < cy) {
+      o.y  = cy + o.r;
+      o.vy = Math.abs(o.vy) * C.DAMPING;
+    }
+  });
+
+  // Orb-orb circle collision resolution
+  for (let i = 0; i < orbs.length; i++) {
+    for (let j = i + 1; j < orbs.length; j++) {
+      const a = orbs[i], b = orbs[j];
+      if (a.merging || b.merging) continue;
+      const dx   = b.x - a.x;
+      const dy   = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      const minD = a.r + b.r;
+      if (dist < minD && dist > 0.01) {
+        // Positional correction (push apart)
+        const overlap = (minD - dist) / 2;
+        const nx = dx / dist, ny = dy / dist;
+        a.x -= nx * overlap; a.y -= ny * overlap;
+        b.x += nx * overlap; b.y += ny * overlap;
+
+        // Velocity impulse (elastic with mass ~ r²)
+        const mA = a.r * a.r, mB = b.r * b.r, mT = mA + mB;
+        const dvx = a.vx - b.vx, dvy = a.vy - b.vy;
+        const dot  = dvx*nx + dvy*ny;
+        if (dot > 0) {
+          const imp = (2 * dot) / mT;
+          a.vx -= imp * mB * nx; a.vy -= imp * mB * ny;
+          b.vx += imp * mA * nx; b.vy += imp * mA * ny;
+          // Dampen
+          a.vx *= 0.92; a.vy *= 0.92;
+          b.vx *= 0.92; b.vy *= 0.92;
+        }
+      }
+    }
+  }
+}
+
+// ── Merge system ──────────────────────────────────────────
+let particles    = [];
+let score        = 0;
+let chainCount   = 0;   // consecutive merges in one drop's settling window
+let chainTimer   = 0;   // frames remaining in chain window after a merge
+let mergesThisDrop = 0;
+let highestChain = 0;
+let totalMerges  = 0;
+
+// Base points per tier merge (tier 0 merge → T1 orb appears, etc.)
+const MERGE_BASE = [10, 25, 60, 140, 320, 720, 1600, 3500];
+
+function checkMerges() {
+  let merged = false;
+  // Iterate pairs looking for touching same-tier orbs
+  outer:
+  for (let i = 0; i < orbs.length; i++) {
+    for (let j = i + 1; j < orbs.length; j++) {
+      const a = orbs[i], b = orbs[j];
+      if (a.merging || b.merging) continue;
+      if (a.tier !== b.tier) continue;
+      if (a.tier >= C.MAX_TIER) continue; // max tier can't merge
+
+      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      if (dist <= a.r + b.r + C.MERGE_GAP) {
+        doMerge(a, b);
+        merged = true;
+        break outer; // restart scan after structural change
+      }
+    }
+  }
+  return merged;
+}
+
+function doMerge(a, b) {
+  const newTier = a.tier + 1;
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+
+  // Mark as merging so physics ignores them this frame
+  a.merging = true; b.merging = true;
+
+  // Spawn merged orb with average velocity + slight upward kick
+  const newOrb  = makeOrb(mx, my, newTier);
+  newOrb.vx = (a.vx + b.vx) * 0.4;
+  newOrb.vy = (a.vy + b.vy) * 0.4 - 1.5;
+
+  // Chain multiplier: 1× base, +0.5 per extra chain, capped at 5×
+  chainCount++;
+  chainTimer = 90; // 1.5 seconds at 60fps
+  if (chainCount > highestChain) highestChain = chainCount;
+  const multi = Math.min(5, 1 + (chainCount - 1) * 0.5);
+  const pts   = Math.round(MERGE_BASE[a.tier] * multi);
+  score += pts;
+  totalMerges++;
+  mergesThisDrop++;
+
+  // Remove old orbs, add new one
+  orbs = orbs.filter(o => o !== a && o !== b);
+  orbs.push(newOrb);
+
+  // Particles burst
+  const skin  = getSkin();
+  const color = skin.colors[Math.min(newTier, skin.colors.length - 1)];
+  spawnParticles(mx, my, color, 12);
+
+  // SFX
+  sfxMerge(newTier);
+  if (chainCount >= 2) {
+    sfxChain(chainCount);
+    showMultiPop(`×${multi.toFixed(1)} CHAIN!`);
+  }
+
+  // Skin unlock check
+  checkSkinUnlocks(score);
+}
+
+// After each physics step, run merge passes until no more merges
+function runMergePass() {
+  let safety = 30; // prevent infinite loop edge cases
+  while (safety-- > 0 && checkMerges()) {}
+}
+
+// ── Particles ─────────────────────────────────────────────
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 2.5 + Math.random() * 4.5;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.5,
+      r : 3 + Math.random() * 3,
+      color,
+      life  : 1,
+      decay : 0.035 + Math.random() * 0.04,
+    });
+  }
+}
+function updateParticles() {
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.15;
+    p.life -= p.decay;
+    p.r = Math.max(0.5, p.r * 0.97);
+  });
+}
+
+// ── Multiplier / pop text ──────────────────────────────────
+function showMultiPop(text) {
+  const el = document.createElement('div');
+  el.className = 'multi-pop'; el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 700);
+}
+
+// ── Danger detection ───────────────────────────────────────
+// Game over when any orb settles above the danger line
+function checkDanger() {
+  const dangerY = container.y + container.h * C.DANGER_H;
+  return orbs.some(o => !o.merging && o.vy === 0 && o.y - o.r <= dangerY);
+}
+
+// ── Rendering ─────────────────────────────────────────────
+function render() {
+  const W = canvas.width, H = canvas.height;
+  const { x: cx, y: cy, w: cw, h: ch } = container;
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0d0015'); bg.addColorStop(1, '#1a0030');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Container shadow / glow
+  ctx.save();
+  ctx.shadowColor = '#e91e8c'; ctx.shadowBlur = 24;
+  ctx.strokeStyle = '#e91e8c44'; ctx.lineWidth = 2;
+  ctx.strokeRect(cx, cy, cw, ch);
+  ctx.shadowBlur = 0; ctx.restore();
+
+  // Container fill
+  const contFill = ctx.createLinearGradient(cx, cy, cx, cy+ch);
+  contFill.addColorStop(0, 'rgba(40,0,60,0.85)');
+  contFill.addColorStop(1, 'rgba(20,0,35,0.95)');
+  ctx.fillStyle = contFill; ctx.fillRect(cx, cy, cw, ch);
+
+  // Danger line
+  const dangerY = cy + ch * C.DANGER_H;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,23,68,0.45)';
+  ctx.setLineDash([6, 5]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cx, dangerY); ctx.lineTo(cx+cw, dangerY); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+  ctx.fillStyle = 'rgba(255,23,68,0.5)'; ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText('⚠ DANGER', cx+cw-4, dangerY-2);
+
+  // Draw aim guide line when not dropping
+  if (gameActive && !dropping && !gamePaused) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(dropX, cy); ctx.lineTo(dropX, cy+ch); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+
+    // Preview orb at drop position (ghost)
+    const r = C.TIERS[nextTier].r;
+    const skin = getSkin();
+    ctx.save(); ctx.globalAlpha = 0.38;
+    skin.draw(ctx, dropX, cy + r + 4, r, nextTier);
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+
+  // Draw orbs (inside container clip)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(cx, cy, cw, ch); ctx.clip();
+  const skin = getSkin();
+  orbs.forEach(o => {
+    if (o.merging) return;
+    ctx.save();
+    skin.draw(ctx, o.x, o.y, o.r, o.tier);
+    // Tier number label
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.font = `bold ${Math.max(9, o.r*0.55)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(o.tier + 1, o.x, o.y);
+    ctx.restore();
+  });
+  ctx.restore();
+
+  // Particles (drawn outside clip so they can escape edges slightly)
+  ctx.save();
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life * 0.9);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha = 1; ctx.restore();
+
+  // Next-orb mini canvas
+  renderNextOrb();
+}
+
+function renderNextOrb() {
+  const nc = document.getElementById('nextOrbCanvas');
+  const nctx = nc.getContext('2d');
+  nctx.clearRect(0, 0, 60, 60);
+  const r    = C.TIERS[nextTier].r * 0.72;
+  const skin = getSkin();
+  nctx.save(); skin.draw(nctx, 30, 30, r, nextTier); nctx.restore();
+  nctx.fillStyle = 'rgba(0,0,0,0.45)';
+  nctx.font = `bold ${Math.max(9, r*0.55)}px sans-serif`;
+  nctx.textAlign = 'center'; nctx.textBaseline = 'middle';
+  nctx.fillText(nextTier + 1, 30, 30);
+}
+
+// ── Game state ─────────────────────────────────────────────
+let gameActive = false, gamePaused = false;
+let gameMode   = 'zen';   // 'zen' | 'timed'
+let timeLeft   = C.TIMED_SEC;
+let timerTick  = 0;       // frame counter for timer (60 frames = 1 second)
+let animId     = null;
+let frameCount = 0;
+let dropCooldown = 0;     // frames before player can drop again
+
+// ── Game loop ──────────────────────────────────────────────
+function gameLoop() {
+  if (!gameActive || gamePaused) return;
+  frameCount++;
+
+  // Timed mode countdown
+  if (gameMode === 'timed') {
+    timerTick++;
+    if (timerTick >= 60) { timerTick = 0; timeLeft = Math.max(0, timeLeft - 1); }
+    const tEl = document.getElementById('hudTimer');
+    tEl.textContent = timeLeft;
+    tEl.classList.toggle('urgent', timeLeft <= 10);
+    if (timeLeft <= 0) { endGame(); return; }
+  }
+
+  // Chain timer countdown
+  if (chainTimer > 0) { chainTimer--; if (chainTimer === 0) { chainCount = 0; dropping = false; } }
+
+  // Drop cooldown
+  if (dropCooldown > 0) dropCooldown--;
+
+  // Physics
+  physicsStep();
+  runMergePass();
+  updateParticles();
+
+  // Update HUD score
+  document.getElementById('hudScore').textContent = score.toLocaleString();
+
+  // Danger check (only when orbs have settled a bit)
+  if (frameCount > 60 && checkDanger()) { endGame(); return; }
+
+  render();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// ── Drop an orb ────────────────────────────────────────────
+function dropOrb() {
+  if (!gameActive || gamePaused || dropping || dropCooldown > 0) return;
+
+  const tier = nextTier;
+  const r    = C.TIERS[tier].r;
+  const o    = makeOrb(
+    Math.max(container.x + r, Math.min(container.x + container.w - r, dropX)),
+    container.y + r,
+    tier
+  );
+  o.vy = 2; // slight initial downward velocity
+  orbs.push(o);
+  sfxDrop(tier);
+
+  // Queue next orb (tiers 0–4 only, weighted toward lower tiers)
+  nextTier = pickNextTier();
+  mergesThisDrop = 0;
+  dropping = true;
+  dropCooldown = 22; // ~0.37s before next drop allowed
+}
+
+function pickNextTier() {
+  // Weighted random: T1 most common, T4 max at game start
+  const maxTierDrop = Math.min(4, Math.floor(score / 300));
+  const pool = [];
+  for (let t = 0; t <= maxTierDrop; t++) {
+    const weight = Math.max(1, maxTierDrop - t + 1);
+    for (let w = 0; w < weight; w++) pool.push(t);
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ── Input ──────────────────────────────────────────────────
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  ensureAudio();
+  if (!gameActive || gamePaused) return;
+  const t = e.touches[0];
+  dropX = clampDropX(t.clientX);
+  dropOrb();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!gameActive || gamePaused) return;
+  dropX = clampDropX(e.touches[0].clientX);
+}, { passive: false });
+
+canvas.addEventListener('click', e => {
+  ensureAudio();
+  if (!gameActive || gamePaused) return;
+  dropX = clampDropX(e.clientX);
+  dropOrb();
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!gameActive || gamePaused) return;
+  dropX = clampDropX(e.clientX);
+});
+
+function clampDropX(clientX) {
+  const r = C.TIERS[nextTier].r;
+  return Math.max(container.x + r, Math.min(container.x + container.w - r, clientX));
+}
+
+// ── Start / End ────────────────────────────────────────────
+function startGame() {
+  ensureAudio();
+  gameActive = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+
+  // Reset
+  orbs      = []; particles = []; orbId = 0;
+  score     = 0; chainCount = 0; chainTimer = 0;
+  highestChain = 0; totalMerges = 0; mergesThisDrop = 0;
+  timeLeft  = C.TIMED_SEC; timerTick = 0; frameCount = 0;
+  dropCooldown = 0; dropping = false;
+  nextTier  = pickNextTier();
+  layoutContainer();
+  dropX     = container.x + container.w / 2;
+
+  // HUD
+  const timerEl = document.getElementById('hudTimer');
+  timerEl.classList.toggle('hidden', gameMode !== 'timed');
+  document.getElementById('hudInfo').textContent = gameMode === 'zen' ? 'Zen Mode' : 'Timed Mode';
+  showScreen(null);
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('nextOrbWrap').classList.remove('hidden');
+
+  gameActive = true; gamePaused = false;
+  startMusic();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  if (!gameActive) return;
+  gameActive = false;
+  stopMusic();
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  sfxGameOver();
+
+  // Timed mode score bonus
+  let finalScore = score;
+  if (gameMode === 'timed') {
+    const bonus = Math.floor(score * (timeLeft / C.TIMED_SEC) * 0.5);
+    finalScore  = score + bonus;
+  }
+
+  const scoreKey = `orb-merge-${gameMode}`;
+  const isNew = (typeof Scores !== 'undefined') ? Scores.set('orb-merge', finalScore) : false;
+
+  showScreen('gameoverScreen');
+  document.getElementById('finalScore').textContent = finalScore.toLocaleString();
+  document.getElementById('newRecordBadge').classList.toggle('hidden', !isNew);
+
+  let rows = `
+    <div class="bd-row"><span>Base Score</span><strong>${score.toLocaleString()}</strong></div>
+    <div class="bd-row"><span>Total Merges</span><strong>${totalMerges}</strong></div>
+    <div class="bd-row"><span>Best Chain</span><strong>×${Math.min(5, 1 + (highestChain-1)*0.5).toFixed(1)}</strong></div>`;
+  if (gameMode === 'timed') {
+    const bonus = finalScore - score;
+    rows += `<div class="bd-row"><span>Time Bonus</span><strong>+${bonus.toLocaleString()}</strong></div>`;
+  }
+  rows += `<div class="bd-row bd-total"><span>Final</span><strong>${finalScore.toLocaleString()}</strong></div>`;
+  document.getElementById('scoreBreakdown').innerHTML = rows;
+  updateStartBest();
+}
+
+function pauseGame() {
+  if (!gameActive) return;
+  gamePaused = true;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  stopMusic();
+  showScreen('pauseScreen');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('nextOrbWrap').classList.remove('hidden');
+}
+
+function resumeGame() {
+  if (!gameActive) return;
+  gamePaused = false;
+  showScreen(null);
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('nextOrbWrap').classList.remove('hidden');
+  startMusic();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// ── Screen management ──────────────────────────────────────
+const SCREENS = ['startScreen','pauseScreen','gameoverScreen','settingsScreen','scoresScreen'];
+let settingsReturnTo = 'startScreen';
+
+function showScreen(id) {
+  SCREENS.forEach(s => document.getElementById(s).classList.add('hidden'));
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('nextOrbWrap').classList.add('hidden');
+  if (id) document.getElementById(id).classList.remove('hidden');
+}
+
+// ── Settings helpers ───────────────────────────────────────
+function buildSkinGrid() {
+  const grid = document.getElementById('skinGrid');
+  grid.innerHTML = '';
+  SKINS.forEach(s => {
+    const unlocked = unlockedSkins.includes(s.id);
+    const div = document.createElement('div');
+    div.className = `skin-card${selectedSkin === s.id ? ' selected' : ''}${!unlocked ? ' locked' : ''}`;
+    div.innerHTML = `<div class="skin-name">${s.name}</div>
+      <div class="skin-req">${s.unlockAt > 0 ? `Unlock @ ${s.unlockAt}pts` : 'Always available'}</div>`;
+    if (unlocked) div.addEventListener('click', () => { selectedSkin = s.id; saveSkins(); buildSkinGrid(); });
+    grid.appendChild(div);
+  });
+}
+
+function openSettings(from) {
+  settingsReturnTo = from;
+  buildSkinGrid();
+  document.getElementById('musicVol').value = musicVol * 100;
+  document.getElementById('sfxVol').value   = sfxVol   * 100;
+  showScreen('settingsScreen');
+  // Keep HUD visible if game was paused
+  if (from === 'pauseScreen') {
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('nextOrbWrap').classList.remove('hidden');
+  }
+}
+
+function buildScoresList() {
+  const sc  = (typeof Scores !== 'undefined') ? Scores.get('orb-merge') : null;
+  const el  = document.getElementById('scoresList');
+  if (!sc) {
+    el.innerHTML = '<p style="color:#ce93d8;text-align:center">No scores yet.<br>Play to set your record!</p>';
+  } else {
+    const d = new Date(sc.date);
+    el.innerHTML = `<div class="score-card">
+      <div class="score-card-val">${sc.score.toLocaleString()}</div>
+      <div class="score-card-label">Best Score — ${d.toLocaleDateString()}</div>
+    </div>`;
+  }
+}
+
+function updateStartBest() {
+  // Update mode buttons with best scores if available — just refresh the start screen label area
+}
+
+// ── Mode selection ─────────────────────────────────────────
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    gameMode = btn.dataset.mode;
+  });
+});
+
+// ── Wire up buttons ────────────────────────────────────────
+document.getElementById('playBtn').addEventListener('click', () => startGame());
+document.getElementById('playAgainBtn').addEventListener('click', () => startGame());
+document.getElementById('menuBtn').addEventListener('click', () => showScreen('startScreen'));
+document.getElementById('settingsBtn').addEventListener('click', () => { ensureAudio(); openSettings('startScreen'); });
+document.getElementById('settingsBackBtn').addEventListener('click', () => {
+  if (settingsReturnTo === 'pauseScreen') { showScreen('pauseScreen'); document.getElementById('hud').classList.remove('hidden'); document.getElementById('nextOrbWrap').classList.remove('hidden'); }
+  else showScreen(settingsReturnTo);
+});
+document.getElementById('scoresBtn').addEventListener('click', () => { buildScoresList(); showScreen('scoresScreen'); });
+document.getElementById('scoresBackBtn').addEventListener('click', () => showScreen('startScreen'));
+document.getElementById('muteBtn').addEventListener('click', toggleMute);
+document.getElementById('pauseBtn').addEventListener('click', () => { if (gameActive && !gamePaused) pauseGame(); });
+document.getElementById('resumeBtn').addEventListener('click', resumeGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+document.getElementById('pauseSettingsBtn').addEventListener('click', () => openSettings('pauseScreen'));
+document.getElementById('musicVol').addEventListener('input', e => setMusicVol(+e.target.value));
+document.getElementById('sfxVol').addEventListener('input',   e => { setSfxVol(+e.target.value); ensureAudio(); });
+
+// ── Init ───────────────────────────────────────────────────
+function init() {
+  loadSkins();
+  // Render a still frame so background shows
+  layoutContainer();
+  ctx.fillStyle = '#0d0015';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+
+
+
+
+</script>
+</body>
+</html>
